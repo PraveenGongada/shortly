@@ -1,0 +1,6 @@
+config/
+temp/
+.git/
+bin/
+deployment/
+config.yaml

@@ -1,0 +1,25 @@
+# ignore env
+.env
+.env-*
+.env.yaml
+config.yaml
+*.env
+
+# ignore pem
+*.pem
+
+bin/
+
+# for air
+temp/air/*
+!temp/air/.gitkeep
+
+# ignore wire
+wire_gen.go
+
+#DS Store
+.DS_Store
+
+# RSA key
+.public
+.private

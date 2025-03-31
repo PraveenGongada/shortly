@@ -1,0 +1,15 @@
+Copyright 2025 Praveen Kumar
+
+This software includes the following third-party libraries:
+
+github.com/go-chi/chi/v5 - MIT License
+github.com/go-chi/cors - MIT License
+github.com/golang-jwt/jwt - MIT License
+github.com/google/uuid - BSD 3-Clause License
+github.com/guregu/null/v5 - MIT License
+github.com/lib/pq - MIT License
+github.com/rs/zerolog - MIT License
+github.com/spf13/viper - MIT License
+github.com/swaggo/http-swagger - MIT License
+github.com/swaggo/swag - MIT License
+golang.org/x/crypto - BSD 3-Clause License

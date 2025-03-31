@@ -1,0 +1,24 @@
+APPLICATION:
+  PORT: 8080
+  SHORT_URL_LENGTH: 7
+  ENVIRONMENT: MASTER
+  MAX_COLLISSION_RETRIES: 1
+  KEY:
+    RSA:
+      PUBLIC:       
+      PRIVATE: 
+  GRACEFUL:
+    MAX_SECOND: 5s
+
+AUTH:
+  JWT_TOKEN:
+    EXPIRED: 24h
+
+DB:
+ POSTGRES:
+    HOST: localhost
+    NAME: postgres
+    PORT: 5432
+    USER: postgres
+    PASS: password
+    SSL: disable

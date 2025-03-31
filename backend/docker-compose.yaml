@@ -1,0 +1,49 @@
+version: "1.0.0"
+
+services:
+  postgres:
+    image: bitnami/postgresql:latest
+    container_name: postgresql
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: shortly
+    ports:
+      - 5432:5432
+    networks:
+      - my_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgres/data
+
+  migrate:
+    image: migrate/migrate:latest
+    profiles: ["tools"]
+    networks:
+      - my_network
+    volumes:
+      - ./migrations/:/migrations
+    entrypoint:
+      [
+        "migrate",
+        "-path",
+        "/migrations",
+        "-database",
+        "postgresql://postgres:password@postgres/postgres?sslmode=disable",
+      ]
+    command: ["up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on_failure
+
+networks:
+  my_network:
+    driver: bridge
+volumes:
+  postgres_data:

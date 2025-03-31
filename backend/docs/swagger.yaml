@@ -1,0 +1,430 @@
+basePath: /api
+definitions:
+  response.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  valueobject.CreateUrlRequest:
+    properties:
+      long_url:
+        type: string
+    type: object
+  valueobject.CreateUrlResponse:
+    properties:
+      id:
+        type: string
+      short_url:
+        type: string
+    type: object
+  valueobject.UrlResponse:
+    properties:
+      id:
+        type: string
+      longUrl:
+        type: string
+      redirects:
+        type: integer
+      shortUrl:
+        type: string
+    type: object
+  valueobject.UrlUpdateRequest:
+    properties:
+      id:
+        type: string
+      new_url:
+        type: string
+    type: object
+  valueobject.UserLoginReqest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  valueobject.UserRegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  valueobject.UserTokenRespBody:
+    properties:
+      token:
+        type: string
+      type:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: A simple URL shortener service with user authentication
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: URL Shortener API
+  version: "1.0"
+paths:
+  /{shortUrl}:
+    get:
+      description: Redirects to the original long URL from a short URL
+      parameters:
+      - description: Short URL code
+        in: path
+        name: shortUrl
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "302":
+          description: Redirect to long URL
+          schema:
+            type: string
+        "404":
+          description: URL not found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Redirect to long URL
+      tags:
+      - url
+  /api/{shortUrl}:
+    get:
+      description: Get the original long URL from a short URL without redirecting
+      parameters:
+      - description: Short URL code
+        in: path
+        name: shortUrl
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Long URL
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "404":
+          description: URL not found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get long URL
+      tags:
+      - url
+  /url/{urlId}:
+    delete:
+      description: Delete a URL
+      parameters:
+      - description: Bearer JWT token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: URL ID
+        in: path
+        name: urlId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: URL deleted successfully
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Delete URL
+      tags:
+      - url
+  /url/analytics/{shortUrl}:
+    get:
+      description: Get analytics for a specific short URL
+      parameters:
+      - description: Bearer JWT token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Short URL code
+        in: path
+        name: shortUrl
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Redirect count
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  type: integer
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: URL not found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get URL analytics
+      tags:
+      - url
+  /url/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a short URL from a long URL
+      parameters:
+      - description: Bearer JWT token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: URL information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/valueobject.CreateUrlRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: URL created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/valueobject.CreateUrlResponse'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Create a short URL
+      tags:
+      - url
+  /url/update:
+    patch:
+      consumes:
+      - application/json
+      description: Update a long URL
+      parameters:
+      - description: Bearer JWT token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: URL update information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/valueobject.UrlUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: URL updated successfully
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Update URL
+      tags:
+      - url
+  /urls:
+    get:
+      description: Get a paginated list of URLs created by the user
+      parameters:
+      - description: Bearer JWT token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        required: true
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: URLs list
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/valueobject.UrlResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get paginated URLs
+      tags:
+      - url
+  /user/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate a user and return a JWT token
+      parameters:
+      - description: User login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/valueobject.UserLoginReqest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/valueobject.UserTokenRespBody'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: User login
+      tags:
+      - user
+  /user/logout:
+    get:
+      description: Logout the current user by invalidating their cookie
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout successful
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: User logout
+      tags:
+      - user
+  /user/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user and return a JWT token
+      parameters:
+      - description: User registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/valueobject.UserRegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Registration successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/valueobject.UserTokenRespBody'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: User registration
+      tags:
+      - user
+swagger: "2.0"

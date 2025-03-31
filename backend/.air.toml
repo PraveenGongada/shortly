@@ -1,0 +1,18 @@
+root = "."
+tmp_dir = "temp/air"
+
+[build]
+  args_bin = []
+  bin = "./temp/air/main"
+  cmd = "go build -o tmp/air/main ./cmd/shortly/main.go"
+  include_ext = ["go", "tpl", "tmpl", "env", "yaml"]
+  exclude_dir = ["temp", "scripts", "assets", "bin", "build", "deploy"]
+  log = "air.log"
+  exclude_unchanged = true
+
+[log]
+  main_only = false
+  time = false
+
+[misc]
+  clean_on_exit = true
