@@ -1,0 +1,30 @@
+name: Backend Verify
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+  pull_request:
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+jobs:
+  verify-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Build backend
+        working-directory: ./backend
+        run: go build -v ./cmd/shortly/main.go
