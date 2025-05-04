@@ -35,6 +35,11 @@ export default function RedirectPage() {
     const fetchUrlAndRedirect = async () => {
       try {
         const response = await urlApi.redirect(shortUrl);
+        if (!response.data || response.data === "") {
+          setError(
+            "The URL you're trying to visit doesn't exist or has been removed.",
+          );
+        }
         window.location.href = response.data;
       } catch (error) {
         setError(
