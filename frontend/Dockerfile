@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:22.15.0-alpine3.21 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -47,15 +47,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3001
 
 # Set environment variables
-ENV PORT=3000
+ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
 # Health check to ensure the application is running
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/ || exit 1
 
 # Run the application
 CMD ["node", "server.js"]

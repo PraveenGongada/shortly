@@ -52,7 +52,7 @@ yarn dev
 
 4. **Access the application**
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3001](http://localhost:3001) in your browser.
 
 ## 🏗️ Project Structure
 
