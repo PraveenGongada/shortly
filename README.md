@@ -55,6 +55,12 @@ shortly/
 │   ├── internal/        # Clean architecture implementation
 │   ├── README.md        # Backend-specific documentation
 │   └── ...
+├── infra/               # Kubernetes configurations (submodule)
+│   ├── namespaces.yaml  # Kubernetes namespace definitions
+│   ├── istio.yaml       # Service mesh configuration
+│   ├── cert-manager.yaml# TLS certificate management
+│   ├── deployment.yaml  # Application deployments
+│   └── monitoring/      # Prometheus and Grafana configs
 └── docs/                # Project documentation and assets
 ```
 
@@ -82,6 +88,24 @@ shortly/
 
 - [Frontend Documentation](https://github.com/PraveenGongada/Shortly/blob/main/frontend/README.md)
 - [Backend Documentation](https://github.com/PraveenGongada/Shortly/blob/main/backend/README.md)
+
+## 🚀 Deployment & Infrastructure
+
+Shortly uses Kubernetes for deployment and infrastructure management. The Kubernetes configuration files are maintained in a separate private repository and linked to this repository using Git submodules.
+
+### Infrastructure Setup
+
+```bash
+# Clone the complete repository with infrastructure configs
+git clone --recursive git@github.com:PraveenGongada/shortly.git
+
+# Or initialize submodules after cloning
+git submodule init
+git submodule update
+
+# To fetch latest changes
+git submodule update --remote
+```
 
 ## 🤝 Contributing
 

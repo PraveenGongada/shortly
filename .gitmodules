@@ -1,0 +1,4 @@
+[submodule "infra"]
+	path = infra
+	url = git@github.com:PraveenGongada/shortly-infra.git
+	branch = main
