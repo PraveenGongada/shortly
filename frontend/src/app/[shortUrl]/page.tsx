@@ -39,8 +39,9 @@ export default function RedirectPage() {
           setError(
             "The URL you're trying to visit doesn't exist or has been removed.",
           );
+        } else {
+          window.location.href = response.data;
         }
-        window.location.href = response.data;
       } catch (error) {
         setError(
           "The URL you're trying to visit doesn't exist or has been removed.",
