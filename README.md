@@ -40,28 +40,33 @@ Shortly is a complete URL shortening solution combining a beautiful, responsive 
 - 📱 Responsive design optimized for all devices
 - 📈 Dashboard to manage all shortened URLs
 - 🔄 RESTful API design with clean architecture
+- 🔍 Centralized logging and monitoring for operational insights
 
 ## 🏗️ Repository Structure
 
 ```
 shortly/
-├── frontend/            # Next.js frontend application
-│   ├── app/             # Pages and routes
-│   ├── components/      # Reusable UI components
-│   ├── README.md        # Frontend-specific documentation
+├── frontend/               # Next.js frontend application
+│   ├── app/                # Pages and routes
+│   ├── components/         # Reusable UI components
+│   ├── README.md           # Frontend-specific documentation
 │   └── ...
-├── backend/             # Go backend service
-│   ├── cmd/             # Application entry points
-│   ├── internal/        # Clean architecture implementation
-│   ├── README.md        # Backend-specific documentation
+├── backend/                # Go backend service
+│   ├── cmd/                # Application entry points
+│   ├── internal/           # Clean architecture implementation
+│   ├── README.md           # Backend-specific documentation
 │   └── ...
-├── infra/               # Kubernetes configurations (submodule)
-│   ├── namespaces.yaml  # Kubernetes namespace definitions
-│   ├── istio.yaml       # Service mesh configuration
-│   ├── cert-manager.yaml# TLS certificate management
-│   ├── deployment.yaml  # Application deployments
-│   └── monitoring/      # Prometheus and Grafana configs
-└── docs/                # Project documentation and assets
+├── infra/                  # Kubernetes configurations (submodule)
+│   ├── namespaces.yaml     # Kubernetes namespace definitions
+│   ├── istio.yaml          # Service mesh configuration
+│   ├── cert-manager.yaml   # TLS certificate management
+│   ├── deployment.yaml     # Application deployments
+│   ├── elastic-search.yaml # Elasticsearch configuration
+│   ├── kibana.yaml         # Kibana dashboard configuration
+│   ├── logstash.yaml       # Log processing pipeline
+│   ├── filebeat.yaml       # Log collection agent
+│   └── monitoring/         # Prometheus and Grafana configs
+└── docs/                   # Project documentation and assets
 ```
 
 ## 🧱 Tech Stack
@@ -83,6 +88,13 @@ shortly/
 - **Containerization**: Docker & Docker Compose
 - **Logging**: Zerolog
 - **Migration**: Golang-Migrate
+
+### Monitoring & Observability
+
+- **Metrics**: Prometheus & Grafana
+- **Logging**: ELK Stack (Elasticsearch, Logstash, Kibana)
+- **Log Collection**: Filebeat
+- **Service Mesh**: Istio
 
 ## 📚 Detailed Documentation
 
