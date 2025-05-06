@@ -17,20 +17,76 @@
 package logging
 
 import (
+	"io"
 	"os"
 	"time"
 
+	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
+func ToZerologLevel(l string) zerolog.Level {
+	switch l {
+	case "trace":
+		return zerolog.TraceLevel
+	case "debug":
+		return zerolog.DebugLevel
+	case "info":
+		return zerolog.InfoLevel
+	case "warn":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	case "fatal":
+		return zerolog.FatalLevel
+	case "panic":
+		return zerolog.PanicLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
+func GetDefaultLogLevel(env string) zerolog.Level {
+	switch env {
+	case "DEVELOPMENT":
+		return zerolog.DebugLevel
+	case "PRODUCTION":
+		return zerolog.InfoLevel
+	case "MASTER":
+		return zerolog.WarnLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
 func InitLogger() {
-	/** Setting up log time format */
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	env := config.Get().Application.Environment
+	configuredLogLevel := config.Get().Application.Log.Level
 
-	/** Printing system info */
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	zerolog.TimeFieldFormat = time.RFC3339
 
-	log.Logger = log.Output(output)
-	log.Info().Msg("Zerolog initialized...")
+	var output io.Writer = os.Stdout
+
+	if env == "DEVELOPMENT" {
+		output = zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339,
+		}
+	}
+
+	var logLevel zerolog.Level
+	if configuredLogLevel != "" {
+		logLevel = ToZerologLevel(configuredLogLevel)
+	} else {
+		logLevel = GetDefaultLogLevel(env)
+	}
+	zerolog.SetGlobalLevel(logLevel)
+
+	log.Logger = zerolog.New(output).With().Timestamp().Logger()
+
+	log.Info().
+		Str("environment", env).
+		Str("log_level", logLevel.String()).
+		Msg("Zerolog initialized...")
 }

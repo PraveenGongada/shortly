@@ -36,7 +36,7 @@ type Config struct {
 		MaxCollisionRetries int8   `mapstructure:"MAX_COLLISSION_RETRIES"`
 		Environment         string `mapstructure:"ENVIRONMENT"`
 		Log                 struct {
-			Path string `mapstructure:"PATH"`
+			Level string `mapstructure:"LEVEL"`
 		}
 		Key struct {
 			Rsa struct {
@@ -70,16 +70,15 @@ type Config struct {
 }
 
 func Get() Config {
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("internal/infrastructure/config")
-	err := viper.ReadInConfig()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot read config file")
-	}
-
 	doOnce.Do(func() {
-		err := viper.Unmarshal(&cfg)
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("internal/infrastructure/config")
+		err := viper.ReadInConfig()
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot read config file")
+		}
+		err = viper.Unmarshal(&cfg)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error unmarshaling config")
 		}
