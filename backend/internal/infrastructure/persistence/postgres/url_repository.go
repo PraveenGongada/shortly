@@ -73,6 +73,9 @@ func (r UrlRepositoryImpl) CreateShortUrl(
 }
 
 func (r UrlRepositoryImpl) GetLongUrl(shortUrl string) (string, error) {
+	logger := log.With().Str("shortUrl", shortUrl).Str("operation", "GetLongUrl").Logger()
+	logger.Debug().Msg("Updating redirect count and retrieving long URL")
+
 	updateAnalytics := `UPDATE url SET redirects=redirects+1 where short_url=$1`
 
 	_, err := r.DB.Exec(updateAnalytics, shortUrl)
@@ -95,6 +98,7 @@ func (r UrlRepositoryImpl) GetLongUrl(shortUrl string) (string, error) {
 	row.Scan(
 		&longUrl,
 	)
+	logger.Debug().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
 
 	return longUrl, nil
 }

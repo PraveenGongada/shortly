@@ -39,6 +39,9 @@ func NewUserRepository(db *PostgresStore) repository.UserRepository {
 }
 
 func (r *UserRepositoryImpl) FindByEmail(email string) (*entity.User, error) {
+	logger := log.With().Str("email", email).Str("operation", "FindByEmail").Logger()
+	logger.Debug().Msg("Finding user by email")
+
 	query := `SELECT * from "user" where email=$1`
 	rows, err := r.DB.Query(query, email)
 	if err != nil {
@@ -68,9 +71,11 @@ func (r *UserRepositoryImpl) FindByEmail(email string) (*entity.User, error) {
 	}
 
 	if user.ID == "" {
+		logger.Warn().Msg("User not found")
 		return nil, errors.Unauthorized("cannot find user with given email & password")
 	}
 
+	logger.Debug().Str("userId", user.ID).Msg("User found successfully")
 	return user, nil
 }
 

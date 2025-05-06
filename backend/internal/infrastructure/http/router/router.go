@@ -36,7 +36,7 @@ func NewHttpRoute(handlers *handler.HttpHandlerImpl) *HttpRouterImpl {
 
 func (h *HttpRouterImpl) Router(r *chi.Mux) {
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"shortly.praveengongada.com"},
+		AllowedOrigins: []string{"shortly.praveengongada.com", "http://localhost:3001"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders: []string{
 			"Accept",

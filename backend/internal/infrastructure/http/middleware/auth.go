@@ -33,28 +33,37 @@ import (
 
 func JwtVerifyToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := log.Ctx(r.Context()).With().Str("middleware", "JwtVerifyToken").Logger()
+		logger.Debug().Msg("Verifying JWT token")
+
 		var JwtToken string
 
 		// Extract Bearer token from Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			JwtToken = strings.TrimPrefix(authHeader, "Bearer ")
+			logger.Debug().Msg("Token found in Authorization header")
 		}
 
 		// If Authorization header is missing, check cookie
 		if JwtToken == "" {
 			cookie, err := r.Cookie("token")
 			if err != nil || cookie.Value == "" {
+				logger.Warn().Err(err).Msg("No token found in request")
 				response.Json(w, http.StatusUnauthorized, "Token is empty", nil)
 				return
 			}
 			JwtToken = cookie.Value
+			logger.Debug().Msg("Token found in cookie")
 		}
 
 		// Parse JWT token
 		token, err := jwt.Parse(JwtToken, func(token *jwt.Token) (interface{}, error) {
 			// Ensure signing method is RSA
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+				logger.Warn().
+					Str("method", token.Header["alg"].(string)).
+					Msg("Unexpected signing method")
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 
@@ -69,7 +78,7 @@ func JwtVerifyToken(next http.Handler) http.Handler {
 
 		// Validate token
 		if err != nil || !token.Valid {
-			log.Err(err).Msg("Token is not valid")
+			log.Warn().Msg("Token is not valid")
 			response.Json(w, http.StatusUnauthorized, "Token is not valid", nil)
 			return
 		}
@@ -77,6 +86,7 @@ func JwtVerifyToken(next http.Handler) http.Handler {
 		// Extract claims safely
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
+			logger.Warn().Msg("Invalid token claims format")
 			response.Json(w, http.StatusUnauthorized, "Invalid token claims", nil)
 			return
 		}
@@ -84,6 +94,7 @@ func JwtVerifyToken(next http.Handler) http.Handler {
 		// Extract user ID
 		id, ok := claims["id"].(string)
 		if !ok || id == "" {
+			logger.Warn().Msg("User ID not found in token")
 			response.Json(w, http.StatusUnauthorized, "ID not found", nil)
 			return
 		}
@@ -91,17 +102,23 @@ func JwtVerifyToken(next http.Handler) http.Handler {
 		// Check expiration time
 		rawExp, ok := claims["exp"].(float64)
 		if !ok {
+			logger.Warn().Msg("Expiration time missing or invalid")
 			response.Json(w, http.StatusUnauthorized, "Expiration time missing or invalid", nil)
 			return
 		}
 		exp := int64(rawExp)
 		if exp < time.Now().Unix() {
+			logger.Warn().
+				Time("expired", time.Unix(exp, 0)).
+				Time("now", time.Now()).
+				Msg("Token has expired")
 			response.Json(w, http.StatusUnauthorized, "Token has expired", nil)
 			return
 		}
 
 		// Set user ID in request header for next handler
 		r.Header.Set("id", id)
+		logger.Info().Str("userId", id).Msg("JWT token validated successfully")
 
 		// Proceed with the next handler
 		next.ServeHTTP(w, r)

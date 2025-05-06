@@ -44,7 +44,7 @@ func NewHttpHandler(
 
 func (h *HttpHandlerImpl) Router(r chi.Router) {
 	r.Use(middleware.StripSlashes)
-	r.Use(middleware.Logger)
+	r.Use(httpmiddleware.RequestLogger)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", heartBeatHandler)

@@ -19,11 +19,13 @@ package logging
 import (
 	"io"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 )
 
 func ToZerologLevel(l string) zerolog.Level {
@@ -66,6 +68,17 @@ func InitLogger() {
 
 	zerolog.TimeFieldFormat = time.RFC3339
 
+	zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
+		short := file
+		for i := len(file) - 1; i > 0; i-- {
+			if file[i] == '/' {
+				short = file[i+1:]
+				break
+			}
+		}
+		return short + ":" + strconv.Itoa(line)
+	}
+
 	var output io.Writer = os.Stdout
 
 	if env == "DEVELOPMENT" {
@@ -83,7 +96,10 @@ func InitLogger() {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	log.Logger = zerolog.New(output).With().Timestamp().Logger()
+	log.Logger = zerolog.New(output).With().
+		Timestamp().
+		Caller().
+		Logger()
 
 	log.Info().
 		Str("environment", env).

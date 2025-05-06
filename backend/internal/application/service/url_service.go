@@ -46,6 +46,9 @@ func (s UrlServiceImpl) CreateShortUrl(
 	userId string,
 	req *valueobject.CreateUrlRequest,
 ) (*valueobject.CreateUrlResponse, error) {
+	logger := log.Ctx(ctx).With().Str("userId", userId).Logger()
+	logger.Info().Str("longUrl", req.LongUrl).Msg("Creating short URL")
+
 	maxCollisionRetries := config.Get().Application.MaxCollisionRetries
 
 	url, err := s.createShotUrlWithRetries(userId, maxCollisionRetries, req)
@@ -54,6 +57,11 @@ func (s UrlServiceImpl) CreateShortUrl(
 	}
 
 	urlResponse := valueobject.CreateShortUrlResponse(url)
+
+	logger.Info().
+		Str("shortUrl", url.ShortUrl).
+		Str("urlId", url.Id).
+		Msg("Successfully created short URL")
 
 	return &urlResponse, nil
 }
@@ -85,11 +93,15 @@ func (s UrlServiceImpl) createShotUrlWithRetries(
 }
 
 func (s UrlServiceImpl) GetLongUrl(ctx context.Context, shortUrl string) (string, error) {
+	logger := log.Ctx(ctx).With().Str("shortUrl", shortUrl).Logger()
+	logger.Info().Msg("Retrieving long URL")
+
 	longUrl, err := s.urlRepository.GetLongUrl(shortUrl)
 	if err != nil {
 		return "", err
 	}
 
+	logger.Info().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
 	return longUrl, nil
 }
 

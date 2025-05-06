@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/PraveenGongada/shortly/internal/domain/user/repository"
@@ -46,6 +47,9 @@ func (s UserServiceImpl) UserLogin(
 	ctx context.Context,
 	req *valueobject.UserLoginReqest,
 ) (*valueobject.UserTokenRespBody, error) {
+	logger := log.Ctx(ctx).With().Str("email", req.Email).Str("operation", "UserLogin").Logger()
+	logger.Info().Msg("User login attempt")
+
 	user, err := s.userRepository.FindByEmail(req.Email)
 	if err != nil {
 		return nil, err
@@ -65,6 +69,7 @@ func (s UserServiceImpl) UserLogin(
 		Token: userToken.Token,
 	}
 
+	logger.Info().Str("userId", user.ID).Msg("Login successful")
 	return &tokenRes, nil
 }
 
