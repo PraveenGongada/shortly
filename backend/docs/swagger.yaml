@@ -75,33 +75,6 @@ info:
 paths:
   /{shortUrl}:
     get:
-      description: Redirects to the original long URL from a short URL
-      parameters:
-      - description: Short URL code
-        in: path
-        name: shortUrl
-        required: true
-        type: string
-      produces:
-      - text/html
-      responses:
-        "302":
-          description: Redirect to long URL
-          schema:
-            type: string
-        "404":
-          description: URL not found
-          schema:
-            $ref: '#/definitions/response.Response'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/response.Response'
-      summary: Redirect to long URL
-      tags:
-      - url
-  /api/{shortUrl}:
-    get:
       description: Get the original long URL from a short URL without redirecting
       parameters:
       - description: Short URL code

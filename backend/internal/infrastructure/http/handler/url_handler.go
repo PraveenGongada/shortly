@@ -121,7 +121,7 @@ func (h HttpHandlerImpl) RedirectUser(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} response.Response{data=string} "Long URL"
 // @Failure 404 {object} response.Response "URL not found"
 // @Failure 500 {object} response.Response "Internal server error"
-// @Router /api/{shortUrl} [get]
+// @Router /{shortUrl} [get]
 func (h HttpHandlerImpl) GetLongUrl(w http.ResponseWriter, r *http.Request) {
 	shortUrl := chi.URLParam(r, "shortUrl")
 

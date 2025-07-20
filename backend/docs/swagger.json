@@ -18,59 +18,6 @@
     "host": "localhost:8080",
     "basePath": "/api",
     "paths": {
-        "/api/{shortUrl}": {
-            "get": {
-                "description": "Get the original long URL from a short URL without redirecting",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "url"
-                ],
-                "summary": "Get long URL",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Short URL code",
-                        "name": "shortUrl",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Long URL",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "404": {
-                        "description": "URL not found",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/url/analytics/{shortUrl}": {
             "get": {
                 "description": "Get analytics for a specific short URL",
@@ -541,14 +488,14 @@
         },
         "/{shortUrl}": {
             "get": {
-                "description": "Redirects to the original long URL from a short URL",
+                "description": "Get the original long URL from a short URL without redirecting",
                 "produces": [
-                    "text/html"
+                    "application/json"
                 ],
                 "tags": [
                     "url"
                 ],
-                "summary": "Redirect to long URL",
+                "summary": "Get long URL",
                 "parameters": [
                     {
                         "type": "string",
@@ -559,10 +506,22 @@
                     }
                 ],
                 "responses": {
-                    "302": {
-                        "description": "Redirect to long URL",
+                    "200": {
+                        "description": "Long URL",
                         "schema": {
-                            "type": "string"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "404": {
