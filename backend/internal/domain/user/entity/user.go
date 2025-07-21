@@ -16,15 +16,19 @@
 
 package entity
 
-import "github.com/guregu/null/v5"
+import (
+	"time"
+
+	"github.com/guregu/null/v5"
+)
 
 type User struct {
-	ID        string      `db:"id"`
-	Email     string      `db:"email"`
-	Password  string      `db:"password"`
-	Name      string      `db:"name"`
-	CreatedAt string      `db:"created_at"`
-	UpdatedAt null.String `db:"updated_at"`
+	ID        string    `db:"id"`
+	Email     string    `db:"email"`
+	Password  string    `db:"password"`
+	Name      string    `db:"name"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt null.Time `db:"updated_at"`
 }
 
 type UsersList []*User

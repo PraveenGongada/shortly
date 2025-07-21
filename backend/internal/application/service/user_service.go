@@ -18,6 +18,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
@@ -47,16 +49,19 @@ func (s UserServiceImpl) UserLogin(
 	ctx context.Context,
 	req *valueobject.UserLoginReqest,
 ) (*valueobject.UserTokenRespBody, error) {
-	logger := log.Ctx(ctx).With().Str("email", req.Email).Str("operation", "UserLogin").Logger()
+	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte(req.Email)))[:12]
+	logger := log.Ctx(ctx).With().Str("emailHash", emailHash).Str("operation", "UserLogin").Logger()
 	logger.Info().Msg("User login attempt")
 
 	user, err := s.userRepository.FindByEmail(req.Email)
 	if err != nil {
+		logger.Warn().Err(err).Msg("User lookup failed")
 		return nil, err
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
+		logger.Warn().Msg("Password verification failed")
 		return nil, errors.Unauthorized("cannot find user with given email & password")
 	}
 

@@ -17,17 +17,22 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
 	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 )
 
 type PostgresStore struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
+}
+
+func (p *PostgresStore) GetQueryTimeout() time.Duration {
+	return config.Get().DB.Postgres.QueryTimeout
 }
 
 func NewPostgresClient() *PostgresStore {
@@ -41,7 +46,7 @@ func NewPostgresClient() *PostgresStore {
 	dbPassword := dbConfig.Pass
 	sslMode := dbConfig.SSLMode
 
-	sHost := fmt.Sprintf(
+	dsn := fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		dbUser,
 		dbPassword,
@@ -50,15 +55,30 @@ func NewPostgresClient() *PostgresStore {
 		dbName,
 		sslMode,
 	)
-	db, err := sql.Open("postgres", sHost)
+
+	poolConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error loading Database")
+		log.Fatal().Err(err).Msg("Error parsing database config")
 	}
 
-	if err = db.Ping(); err != nil {
+	poolConfig.MaxConns = dbConfig.Pool.MaxConns
+	poolConfig.MinConns = dbConfig.Pool.MinConns
+	poolConfig.MaxConnLifetime = dbConfig.Pool.MaxConnLifetime
+	poolConfig.MaxConnIdleTime = dbConfig.Pool.MaxConnIdleTime
+	poolConfig.HealthCheckPeriod = dbConfig.Pool.HealthCheckPeriod
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbConfig.ConnectTimeout)
+	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error creating connection pool")
+	}
+
+	if err = pool.Ping(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Error connecting to Database")
 	}
 
-	log.Info().Str("Name", dbName).Msg("Success connecting to DB")
-	return &PostgresStore{DB: db}
+	log.Info().Str("Name", dbName).Msg("Success connecting to DB with pgx")
+	return &PostgresStore{DB: pool}
 }

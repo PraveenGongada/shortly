@@ -55,7 +55,7 @@ func (h HttpHandlerImpl) UserLogin(w http.ResponseWriter, r *http.Request) {
 
 	err = utils.SetCookie(w, res.Token)
 	if err != nil {
-		log.Err(err).Msg("Error setting the cookie")
+		log.Ctx(r.Context()).Warn().Err(err).Msg("Error setting login cookie")
 	}
 
 	response.Json(w, http.StatusOK, "Login successful!", res)
@@ -100,7 +100,7 @@ func (h HttpHandlerImpl) UserRegsiter(w http.ResponseWriter, r *http.Request) {
 
 	err = utils.SetCookie(w, userResponse.Token)
 	if err != nil {
-		log.Err(err).Msg("Error setting the cookie")
+		log.Ctx(r.Context()).Warn().Err(err).Msg("Error setting registration cookie")
 	}
 
 	response.Json(w, http.StatusOK, "Registration successful!", userResponse)

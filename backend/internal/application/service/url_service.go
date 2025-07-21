@@ -19,7 +19,7 @@ package service
 import (
 	"context"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/rs/zerolog/log"
 
 	"github.com/PraveenGongada/shortly/internal/domain/url/entity"
@@ -47,12 +47,13 @@ func (s UrlServiceImpl) CreateShortUrl(
 	req *valueobject.CreateUrlRequest,
 ) (*valueobject.CreateUrlResponse, error) {
 	logger := log.Ctx(ctx).With().Str("userId", userId).Logger()
-	logger.Info().Str("longUrl", req.LongUrl).Msg("Creating short URL")
+	logger.Debug().Str("longUrl", req.LongUrl).Msg("Starting short URL creation")
 
 	maxCollisionRetries := config.Get().Application.MaxCollisionRetries
 
 	url, err := s.createShotUrlWithRetries(userId, maxCollisionRetries, req)
 	if err != nil {
+		logger.Error().Err(err).Msg("Failed to create short URL after retries")
 		return nil, err
 	}
 
@@ -61,7 +62,7 @@ func (s UrlServiceImpl) CreateShortUrl(
 	logger.Info().
 		Str("shortUrl", url.ShortUrl).
 		Str("urlId", url.Id).
-		Msg("Successfully created short URL")
+		Msg("Short URL created successfully")
 
 	return &urlResponse, nil
 }
@@ -72,7 +73,6 @@ func (s UrlServiceImpl) createShotUrlWithRetries(
 	req *valueobject.CreateUrlRequest,
 ) (*entity.Url, error) {
 	if retriesLeft <= 0 {
-		log.Err(errors.InternalServerError()).Msg("Max Collisions reached")
 		return nil, errors.InternalServerError()
 	}
 
@@ -81,11 +81,10 @@ func (s UrlServiceImpl) createShotUrlWithRetries(
 
 	shortUrl, err := s.urlRepository.CreateShortUrl(uuid, userId, shortId, req)
 	if err != nil {
-		pgErr, ok := err.(*pq.Error)
-		if ok && pgErr.Code.Name() == "unique_violation" {
+		pgErr, ok := err.(*pgconn.PgError)
+		if ok && pgErr.Code == "23505" { // unique_violation
 			return s.createShotUrlWithRetries(userId, retriesLeft-1, req)
 		} else {
-			log.Err(err).Msg("Error in CreateShortUrl")
 			return nil, errors.InternalServerError()
 		}
 	}
@@ -94,14 +93,14 @@ func (s UrlServiceImpl) createShotUrlWithRetries(
 
 func (s UrlServiceImpl) GetLongUrl(ctx context.Context, shortUrl string) (string, error) {
 	logger := log.Ctx(ctx).With().Str("shortUrl", shortUrl).Logger()
-	logger.Info().Msg("Retrieving long URL")
 
 	longUrl, err := s.urlRepository.GetLongUrl(shortUrl)
 	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to retrieve long URL")
 		return "", err
 	}
 
-	logger.Info().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
+	logger.Debug().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
 	return longUrl, nil
 }
 

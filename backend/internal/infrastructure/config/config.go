@@ -65,6 +65,15 @@ type Config struct {
 			User    string `mapstructure:"USER"`
 			Pass    string `mapstructure:"PASS"`
 			SSLMode string `mapstructure:"SSL"`
+			Pool    struct {
+				MaxConns          int32         `mapstructure:"MAX_CONNS"` // (CPU cores × 2) + effective disk spindles
+				MinConns          int32         `mapstructure:"MIN_CONNS"`
+				MaxConnLifetime   time.Duration `mapstructure:"MAX_CONN_LIFETIME"`
+				MaxConnIdleTime   time.Duration `mapstructure:"MAX_CONN_IDLE_TIME"`
+				HealthCheckPeriod time.Duration `mapstructure:"HEALTH_CHECK_PERIOD"`
+			} `mapstructure:"POOL"`
+			QueryTimeout   time.Duration `mapstructure:"QUERY_TIMEOUT"`
+			ConnectTimeout time.Duration `mapstructure:"CONNECT_TIMEOUT"`
 		} `mapstructure:"POSTGRES"`
 	} `mapstructure:"DB"`
 }

@@ -16,14 +16,18 @@
 
 package entity
 
-import "github.com/guregu/null/v5"
+import (
+	"time"
+
+	"github.com/guregu/null/v5"
+)
 
 type Url struct {
-	Id        string      `db:"id"`
-	UserID    string      `db:"user_id"`
-	ShortUrl  string      `db:"short_url"`
-	LongUrl   string      `db:"long_url"`
-	Redirects int         `db:"redirects"`
-	CreatedAt string      `db:"created_at"`
-	UpdatedAt null.String `db:"updated_at"`
+	Id        string    `db:"id"`
+	UserID    string    `db:"user_id"`
+	ShortUrl  string    `db:"short_url"`
+	LongUrl   string    `db:"long_url"`
+	Redirects int       `db:"redirects"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt null.Time `db:"updated_at"`
 }
