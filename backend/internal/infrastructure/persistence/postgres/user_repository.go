@@ -17,9 +17,12 @@
 package postgres
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/rs/zerolog/log"
 
 	"github.com/PraveenGongada/shortly/internal/domain/user/entity"
@@ -39,40 +42,33 @@ func NewUserRepository(db *PostgresStore) repository.UserRepository {
 }
 
 func (r *UserRepositoryImpl) FindByEmail(email string) (*entity.User, error) {
-	logger := log.With().Str("email", email).Str("operation", "FindByEmail").Logger()
+	// Hash email for privacy-safe logging - same approach as in service layer
+	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte(email)))[:12]
+	logger := log.With().Str("emailHash", emailHash).Str("operation", "FindByEmail").Logger()
 	logger.Debug().Msg("Finding user by email")
 
-	query := `SELECT * from "user" where email=$1`
-	rows, err := r.DB.Query(query, email)
-	if err != nil {
-		log.Err(err).Msg("error fetching user")
-		return nil, errors.InternalServerError()
-	}
-	defer rows.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
+	defer cancel()
 
-	if err = rows.Err(); err != nil {
-		return nil, errors.NotFound(fmt.Sprintf("cannot find user with email %v", email))
-	}
+	query := `SELECT id, name, email, password, created_at, updated_at FROM "user" WHERE email=$1`
 
 	user := &entity.User{}
-	for rows.Next() {
-		err = rows.Scan(
-			&user.ID,
-			&user.Name,
-			&user.Email,
-			&user.Password,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		)
-		if err != nil {
-			log.Err(err).Msg("Error scanning rows in FindByEmail")
-			return nil, errors.InternalServerError()
-		}
-	}
+	err := r.DB.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 
-	if user.ID == "" {
-		logger.Warn().Msg("User not found")
-		return nil, errors.Unauthorized("cannot find user with given email & password")
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			logger.Debug().Msg("User not found")
+			return nil, errors.Unauthorized("cannot find user with given email & password")
+		}
+		logger.Error().Err(err).Msg("Error finding user by email")
+		return nil, errors.InternalServerError()
 	}
 
 	logger.Debug().Str("userId", user.ID).Msg("User found successfully")
@@ -80,33 +76,27 @@ func (r *UserRepositoryImpl) FindByEmail(email string) (*entity.User, error) {
 }
 
 func (r *UserRepositoryImpl) FindByID(ID string) (*entity.User, error) {
-	query := `SELECT * from "user" where id=$1`
+	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
+	defer cancel()
 
-	rows, err := r.DB.Query(query, ID)
-	if err != nil {
-		log.Err(err).Msg("error fetching user")
-		return nil, errors.InternalServerError()
-	}
-	defer rows.Close()
-
-	if err = rows.Err(); err != nil {
-		return nil, errors.NotFound(fmt.Sprintf("cannot find user with email %v", ID))
-	}
+	query := `SELECT id, name, email, password, created_at, updated_at FROM "user" WHERE id=$1`
 
 	user := &entity.User{}
-	for rows.Next() {
-		err = rows.Scan(
-			&user.ID,
-			&user.Name,
-			&user.Email,
-			&user.Password,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		)
-		if err != nil {
-			log.Err(err).Msg("Error scanning rows in FindById")
-			return nil, errors.InternalServerError()
+	err := r.DB.QueryRow(ctx, query, ID).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, errors.NotFound(fmt.Sprintf("cannot find user with ID %v", ID))
 		}
+		log.Err(err).Msg("Error finding user by ID")
+		return nil, errors.InternalServerError()
 	}
 
 	return user, nil
@@ -116,36 +106,28 @@ func (r UserRepositoryImpl) CreateUser(
 	req *valueobject.UserRegisterRequest,
 	uuid string,
 ) (*entity.User, error) {
-	query := `INSERT INTO "user" (id, name, email, password) VALUES ($1,$2,$3,$4) RETURNING *;`
+	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
+	defer cancel()
 
-	rows, err := r.DB.Query(query, uuid, req.Name, req.Email, req.Password)
-	if err != nil {
-		pgErr, ok := err.(*pq.Error)
-		if ok && pgErr.Code.Name() == "unique_violation" {
-			return nil, errors.Unauthorized("email is already registered")
-		} else {
-			log.Err(err).Msg("Error creating user")
-			return nil, errors.InternalServerError()
-		}
-	}
-
-	defer rows.Close()
+	query := `INSERT INTO "user" (id, name, email, password) VALUES ($1,$2,$3,$4) RETURNING id, name, email, password, created_at, updated_at`
 
 	user := &entity.User{}
+	err := r.DB.QueryRow(ctx, query, uuid, req.Name, req.Email, req.Password).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 
-	for rows.Next() {
-		err = rows.Scan(
-			&user.ID,
-			&user.Email,
-			&user.Password,
-			&user.Name,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		)
-		if err != nil {
-			log.Err(err).Msg("Error scanning rows CreateUser")
-			return nil, errors.InternalServerError()
+	if err != nil {
+		pgErr, ok := err.(*pgconn.PgError)
+		if ok && pgErr.Code == "23505" { // unique_violation
+			return nil, errors.Unauthorized("email is already registered")
 		}
+		log.Err(err).Msg("Error creating user")
+		return nil, errors.InternalServerError()
 	}
 
 	return user, nil

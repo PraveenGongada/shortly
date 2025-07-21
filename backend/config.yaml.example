@@ -24,3 +24,11 @@ DB:
     USER: postgres
     PASS: password
     SSL: disable
+    QUERY_TIMEOUT: 5s
+    CONNECT_TIMEOUT: 10s
+    POOL:
+      MAX_CONNS: 10
+      MIN_CONNS: 2
+      MAX_CONN_LIFETIME: 1h
+      MAX_CONN_IDLE_TIME: 15m
+      HEALTH_CHECK_PERIOD: 2m

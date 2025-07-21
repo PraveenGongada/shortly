@@ -45,34 +45,32 @@ import (
 // @Router /url/create [post]
 func (h HttpHandlerImpl) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 	logger := log.Ctx(r.Context()).With().Str("handler", "CreateShortUrl").Logger()
-	logger.Info().Msg("Processing create short URL request")
 
 	req := &valueobject.CreateUrlRequest{}
-
 	err := json.NewDecoder(r.Body).Decode(&req)
 
 	validUrl := strings.TrimSpace(req.LongUrl) != "" || strings.HasPrefix(req.LongUrl, "http") ||
 		strings.HasPrefix(req.LongUrl, "https")
 
 	if err != nil || !validUrl {
-		logger.Warn().Err(err).Str("longUrl", req.LongUrl).Msg("Invalid request")
+		logger.Warn().Err(err).Str("longUrl", req.LongUrl).Msg("Invalid request payload")
 		response.Err(w, errors.BadRequest("Invalid Request"))
 		return
 	}
 
 	userId := r.Header.Get("id")
-	logger.Debug().Str("userId", userId).Str("longUrl", req.LongUrl).Msg("Creating short URL")
 
 	urlResponse, err := h.urlService.CreateShortUrl(r.Context(), userId, req)
 	if err != nil {
-		logger.Error().Err(err).Msg("Failed to create short URL")
+		logger.Error().Err(err).Msg("Service layer error creating short URL")
 		response.Err(w, err)
 		return
 	}
+
 	logger.Info().
 		Str("shortUrl", urlResponse.ShortUrl).
 		Str("urlId", urlResponse.Id).
-		Msg("Short URL created successfully")
+		Msg("Short URL creation request completed successfully")
 
 	response.Json(w, http.StatusCreated, "Short url created successfully", urlResponse)
 }
@@ -100,15 +98,14 @@ func (h HttpHandlerImpl) RedirectUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info().Msg("Processing redirect request")
-
 	longUrl, err := h.urlService.GetLongUrl(r.Context(), shortUrl)
 	if err != nil {
+		logger.Warn().Err(err).Msg("Redirect failed - URL not found or error")
 		response.Err(w, err)
 		return
 	}
 
-	logger.Info().Str("longUrl", longUrl).Str("shortUrl", shortUrl).Msg("Redirecting to long URL")
+	logger.Info().Str("longUrl", longUrl).Msg("Redirect successful")
 	http.Redirect(w, r, longUrl, http.StatusFound)
 }
 

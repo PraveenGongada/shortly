@@ -8,6 +8,9 @@ DOCKER_COMPOSE_FILE ?= docker-compose.yaml
 MIGRATION_NAME ?= new_migration
 ROLLBACK_COUNT ?= 1
 
+MAKEFLAGS += --output-sync=target
+SHELL := /bin/bash
+
 #==================#
 #== Color Values ==#
 #==================#
@@ -65,6 +68,10 @@ run: start-services migrate-up build
 	@./bin/main
 
 dev: start-services migrate-up
+	@go run github.com/air-verse/air -c .air.toml
+
+dev-restart:
+	@printf "${YELLOW}Quick restart with existing containers...${RESET}\n"
 	@go run github.com/air-verse/air -c .air.toml
 
 swagger:
