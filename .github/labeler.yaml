@@ -1,0 +1,45 @@
+frontend:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - 'frontend/**/*'
+
+backend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'backend/**/*'
+
+infra:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'infra/**/*'
+
+feature:
+  - head-branch: 
+    - '^feature\/.*'
+    - '^feat\/.*'
+
+fix:
+  - head-branch:
+    - '^fix\/.*'
+    - '^bugfix\/.*'
+    - '^hotfix\/.*'
+
+chore:
+  - head-branch:
+    - '^chore\/.*'
+
+docs:
+  - head-branch:
+    - '^docs\/.*'
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - 'docs/**/*'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'package*.json'
+      - 'yarn.lock'
+      - 'go.mod'
+      - 'go.sum'
