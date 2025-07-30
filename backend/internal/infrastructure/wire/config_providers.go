@@ -25,7 +25,6 @@ import (
 	urlRepository "github.com/PraveenGongada/shortly/internal/domain/url/repository"
 	urlDomainService "github.com/PraveenGongada/shortly/internal/domain/url/service"
 	infraConfig "github.com/PraveenGongada/shortly/internal/infrastructure/config"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/logging/zerolog"
 )
 
 // Config providers that create domain config interfaces
@@ -54,10 +53,6 @@ func ProvideServerConfig() config.ServerConfig {
 func ProvideLogConfig() config.LogConfig {
 	cfg := infraConfig.GetGlobalConfig()
 	return infraConfig.NewLogConfigAdapter(cfg)
-}
-
-func ProvideLogger(logConfig config.LogConfig) logger.Logger {
-	return zerolog.New()
 }
 
 func NewGenerator(urlConfig config.URLConfig) interfaces.ShortCodeGenerator {
