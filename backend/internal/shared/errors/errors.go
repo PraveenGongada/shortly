@@ -57,3 +57,17 @@ func Unauthorized(msg string) error {
 		Message: msg,
 	}
 }
+
+func Conflict(msg string) error {
+	return &ErrorResp{
+		Code:    http.StatusConflict,
+		Message: msg,
+	}
+}
+
+func Forbidden(msg string) error {
+	return &ErrorResp{
+		Code:    http.StatusForbidden,
+		Message: msg,
+	}
+}

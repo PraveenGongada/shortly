@@ -22,51 +22,56 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
+
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 )
 
-func RequestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+func RequestLogger(domainLogger logger.Logger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
 
-		requestID := r.Header.Get("X-Request-ID")
-		if requestID == "" {
-			requestID = uuid.New().String()
-		}
+			requestID := r.Header.Get("X-Request-ID")
+			if requestID == "" {
+				requestID = uuid.New().String()
+			}
 
-		ctx := r.Context()
-		ctx = log.With().Str("request_id", requestID).Logger().WithContext(ctx)
-		r = r.WithContext(ctx)
+			ctx := r.Context()
+			// Add request ID to logger context using domain logger
+			ctx = domainLogger.WithContext(ctx, logger.String("request_id", requestID))
+			r = r.WithContext(ctx)
 
-		w.Header().Set("X-Request-ID", requestID)
+			w.Header().Set("X-Request-ID", requestID)
 
-		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-		next.ServeHTTP(ww, r)
+			next.ServeHTTP(ww, r)
 
-		path := r.URL.Path
-		method := r.Method
-		statusCode := ww.Status()
-		bytesWritten := ww.BytesWritten()
-		duration := time.Since(start)
-		remoteAddr := r.RemoteAddr
+			path := r.URL.Path
+			method := r.Method
+			statusCode := ww.Status()
+			bytesWritten := ww.BytesWritten()
+			duration := time.Since(start)
+			remoteAddr := r.RemoteAddr
 
-		logger := log.With().
-			Str("request_id", requestID).
-			Str("remote_addr", remoteAddr).
-			Str("method", method).
-			Str("path", path).
-			Int("status", statusCode).
-			Int("bytes_written", bytesWritten).
-			Dur("duration", duration).
-			Logger()
+			// Use domain logger with structured fields
+			logFields := []logger.Field{
+				logger.String("request_id", requestID),
+				logger.String("remote_addr", remoteAddr),
+				logger.String("method", method),
+				logger.String("path", path),
+				logger.Int("status", statusCode),
+				logger.Int("bytes_written", bytesWritten),
+				logger.Any("duration", duration),
+			}
 
-		if statusCode >= 500 {
-			logger.Error().Msg("Request completed with server error")
-		} else if statusCode >= 400 {
-			logger.Warn().Msg("Request completed with client error")
-		} else {
-			logger.Info().Msg("Request completed")
-		}
-	})
+			if statusCode >= 500 {
+				domainLogger.Error(ctx, "Request completed with server error", logFields...)
+			} else if statusCode >= 400 {
+				domainLogger.Warn(ctx, "Request completed with client error", logFields...)
+			} else {
+				domainLogger.Info(ctx, "Request completed", logFields...)
+			}
+		})
+	}
 }

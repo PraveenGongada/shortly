@@ -20,115 +20,154 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/rs/zerolog/log"
 
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/user/entity"
 	"github.com/PraveenGongada/shortly/internal/domain/user/repository"
-	"github.com/PraveenGongada/shortly/internal/domain/user/valueobject"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
-type UserRepositoryImpl struct {
-	*PostgresStore
+type userRepository struct {
+	store  Store
+	logger logger.Logger
 }
 
-func NewUserRepository(db *PostgresStore) repository.UserRepository {
-	return &UserRepositoryImpl{
-		PostgresStore: db,
+// NewUserRepository creates a new user repository implementation
+func NewUserRepository(store Store, logger logger.Logger) repository.UserRepository {
+	return &userRepository{
+		store:  store,
+		logger: logger,
 	}
 }
 
-func (r *UserRepositoryImpl) FindByEmail(email string) (*entity.User, error) {
+func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	// Hash email for privacy-safe logging - same approach as in service layer
 	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte(email)))[:12]
-	logger := log.With().Str("emailHash", emailHash).Str("operation", "FindByEmail").Logger()
-	logger.Debug().Msg("Finding user by email")
-
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+	r.logger.Debug(ctx, "Finding user by email",
+		logger.String("emailHash", emailHash),
+		logger.String("operation", "FindByEmail"))
 
 	query := `SELECT id, name, email, password, created_at, updated_at FROM "user" WHERE email=$1`
 
-	user := &entity.User{}
-	err := r.DB.QueryRow(ctx, query, email).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Password,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+	var id, name, userEmail, password string
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query, email).Scan(
+		&id, &name, &userEmail, &password, &createdAt, &updatedAt,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			logger.Debug().Msg("User not found")
-			return nil, errors.Unauthorized("cannot find user with given email & password")
+			r.logger.Debug(ctx, "User not found",
+				logger.String("emailHash", emailHash),
+				logger.String("operation", "FindByEmail"))
+			return nil, errors.NotFoundError("user not found")
 		}
-		logger.Error().Err(err).Msg("Error finding user by email")
-		return nil, errors.InternalServerError()
+		r.logger.Error(ctx, "Error finding user by email",
+			logger.String("emailHash", emailHash),
+			logger.String("operation", "FindByEmail"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 
-	logger.Debug().Str("userId", user.ID).Msg("User found successfully")
+	user := entity.NewUserFromRepository(id, userEmail, password, name, createdAt, updatedAt)
+	r.logger.Debug(ctx, "User found successfully",
+		logger.String("emailHash", emailHash),
+		logger.String("userId", user.ID()),
+		logger.String("operation", "FindByEmail"))
 	return user, nil
 }
 
-func (r *UserRepositoryImpl) FindByID(ID string) (*entity.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 
 	query := `SELECT id, name, email, password, created_at, updated_at FROM "user" WHERE id=$1`
 
-	user := &entity.User{}
-	err := r.DB.QueryRow(ctx, query, ID).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Password,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+	var userId, name, email, password string
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query, id).Scan(
+		&userId, &name, &email, &password, &createdAt, &updatedAt,
 	)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil, errors.NotFound(fmt.Sprintf("cannot find user with ID %v", ID))
+			r.logger.Debug(ctx, "User not found",
+				logger.String("userId", id),
+				logger.String("operation", "FindByID"))
+			return nil, errors.NotFoundError("user not found")
 		}
-		log.Err(err).Msg("Error finding user by ID")
-		return nil, errors.InternalServerError()
+		r.logger.Error(ctx, "Error finding user by ID",
+			logger.String("userId", id),
+			logger.String("operation", "FindByID"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 
+	user := entity.NewUserFromRepository(userId, email, password, name, createdAt, updatedAt)
+	r.logger.Debug(ctx, "User found successfully",
+		logger.String("userId", id),
+		logger.String("operation", "FindByID"))
 	return user, nil
 }
 
-func (r UserRepositoryImpl) CreateUser(
-	req *valueobject.UserRegisterRequest,
-	uuid string,
-) (*entity.User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+func (r *userRepository) Save(ctx context.Context, user *entity.User) (*entity.User, error) {
 
-	query := `INSERT INTO "user" (id, name, email, password) VALUES ($1,$2,$3,$4) RETURNING id, name, email, password, created_at, updated_at`
+	query := `INSERT INTO "user" (id, name, email, password, created_at) 
+			  VALUES ($1, $2, $3, $4, $5) 
+			  RETURNING id, name, email, password, created_at, updated_at`
 
-	user := &entity.User{}
-	err := r.DB.QueryRow(ctx, query, uuid, req.Name, req.Email, req.Password).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Password,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	var id, name, email, password string
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query,
+		user.ID(),
+		user.Name(),
+		user.Email(),
+		user.HashedPassword(),
+		user.CreatedAt(),
+	).Scan(&id, &name, &email, &password, &createdAt, &updatedAt)
 
 	if err != nil {
 		pgErr, ok := err.(*pgconn.PgError)
 		if ok && pgErr.Code == "23505" { // unique_violation
-			return nil, errors.Unauthorized("email is already registered")
+			r.logger.Warn(ctx, "Email already exists",
+				logger.String("userId", user.ID()),
+				logger.String("operation", "Save"))
+			return nil, errors.ConflictError("email already registered")
 		}
-		log.Err(err).Msg("Error creating user")
-		return nil, errors.InternalServerError()
+		r.logger.Error(ctx, "Error creating user",
+			logger.String("userId", user.ID()),
+			logger.String("operation", "Save"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 
-	return user, nil
+	savedUser := entity.NewUserFromRepository(id, email, password, name, createdAt, updatedAt)
+	r.logger.Info(ctx, "User saved successfully",
+		logger.String("userId", user.ID()),
+		logger.String("operation", "Save"))
+	return savedUser, nil
+}
+
+func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+
+	query := `SELECT EXISTS(SELECT 1 FROM "user" WHERE email = $1)`
+
+	var exists bool
+	err := r.store.Pool().QueryRow(ctx, query, email).Scan(&exists)
+	if err != nil {
+		r.logger.Error(ctx, "Error checking if user exists by email",
+			logger.String("operation", "ExistsByEmail"),
+			logger.Error(err))
+		return false, errors.InternalError("database operation failed")
+	}
+
+	return exists, nil
 }

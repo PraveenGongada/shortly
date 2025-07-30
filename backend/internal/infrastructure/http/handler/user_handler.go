@@ -20,12 +20,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/rs/zerolog/log"
-
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/user/valueobject"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/response"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
-	"github.com/PraveenGongada/shortly/internal/shared/utils"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
 // UserLogin godoc
@@ -40,25 +38,25 @@ import (
 // @Failure 401 {object} response.Response "Invalid credentials"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /user/login [post]
-func (h HttpHandlerImpl) UserLogin(w http.ResponseWriter, r *http.Request) {
-	loginReq := &valueobject.UserLoginReqest{}
-	if err := json.NewDecoder(r.Body).Decode(loginReq); err != nil {
-		response.Err(w, errors.BadRequest("Error decoding Request"))
+func (h *Handler) UserLogin(w http.ResponseWriter, r *http.Request) {
+	var loginReq valueobject.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
+		response.Err(w, errors.ValidationError("Invalid request format"))
 		return
 	}
 
-	res, err := h.userService.UserLogin(r.Context(), loginReq)
+	tokenResp, err := h.userService.Login(r.Context(), &loginReq)
 	if err != nil {
 		response.Err(w, err)
 		return
 	}
 
-	err = utils.SetCookie(w, res.Token)
-	if err != nil {
-		log.Ctx(r.Context()).Warn().Err(err).Msg("Error setting login cookie")
+	// Set authentication cookie
+	if err := h.cookieManager.SetAuthCookie(w, tokenResp.Token); err != nil {
+		h.logger.Warn(r.Context(), "Error setting login cookie", logger.Error(err))
 	}
 
-	response.Json(w, http.StatusOK, "Login successful!", res)
+	response.Json(w, http.StatusOK, "Login successful!", tokenResp)
 }
 
 // UserLogout godoc
@@ -68,9 +66,15 @@ func (h HttpHandlerImpl) UserLogin(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Success 200 {object} response.Response "Logout successful"
 // @Router /user/logout [get]
-func (h HttpHandlerImpl) UserLogout(w http.ResponseWriter, r *http.Request) {
-	utils.InvalidateCookie(w)
-	response.Json(w, http.StatusOK, "success!", nil)
+func (h *Handler) UserLogout(w http.ResponseWriter, r *http.Request) {
+	// Call service logout (for potential token blacklisting)
+	if err := h.userService.Logout(r.Context()); err != nil {
+		h.logger.Warn(r.Context(), "Error during logout", logger.Error(err))
+	}
+
+	// Invalidate cookie
+	h.cookieManager.InvalidateAuthCookie(w)
+	response.Json(w, http.StatusOK, "Logout successful!", nil)
 }
 
 // UserRegsiter godoc
@@ -85,23 +89,23 @@ func (h HttpHandlerImpl) UserLogout(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.Response "Email already registered"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /user/register [post]
-func (h HttpHandlerImpl) UserRegsiter(w http.ResponseWriter, r *http.Request) {
-	registerReq := &valueobject.UserRegisterRequest{}
-	if err := json.NewDecoder(r.Body).Decode(registerReq); err != nil {
-		response.Err(w, errors.BadRequest("Error decoding data"))
+func (h *Handler) UserRegister(w http.ResponseWriter, r *http.Request) {
+	var registerReq valueobject.RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&registerReq); err != nil {
+		response.Err(w, errors.ValidationError("Invalid request format"))
 		return
 	}
 
-	userResponse, err := h.userService.UserRegister(r.Context(), registerReq)
+	tokenResp, err := h.userService.Register(r.Context(), &registerReq)
 	if err != nil {
 		response.Err(w, err)
 		return
 	}
 
-	err = utils.SetCookie(w, userResponse.Token)
-	if err != nil {
-		log.Ctx(r.Context()).Warn().Err(err).Msg("Error setting registration cookie")
+	// Set authentication cookie
+	if err := h.cookieManager.SetAuthCookie(w, tokenResp.Token); err != nil {
+		h.logger.Warn(r.Context(), "Error setting registration cookie", logger.Error(err))
 	}
 
-	response.Json(w, http.StatusOK, "Registration successful!", userResponse)
+	response.Json(w, http.StatusCreated, "Registration successful!", tokenResp)
 }

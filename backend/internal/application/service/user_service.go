@@ -21,94 +21,148 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/bcrypt"
-
+	"github.com/PraveenGongada/shortly/internal/domain/interfaces"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
+	"github.com/PraveenGongada/shortly/internal/domain/user/entity"
 	"github.com/PraveenGongada/shortly/internal/domain/user/repository"
-	userService "github.com/PraveenGongada/shortly/internal/domain/user/service"
 	"github.com/PraveenGongada/shortly/internal/domain/user/valueobject"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/auth"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 	"github.com/PraveenGongada/shortly/internal/shared/utils"
 )
 
-type UserServiceImpl struct {
-	jwtAuth        auth.JwtToken
-	userRepository repository.UserRepository
+// TokenGenerator defines interface for token generation
+type TokenGenerator interface {
+	GenerateToken(userID string) (string, string, error) // returns type, token, error
 }
 
-func NewUserService(jwtAuth auth.JwtToken, repo repository.UserRepository) userService.UserService {
-	return &UserServiceImpl{
-		jwtAuth:        jwtAuth,
-		userRepository: repo,
+// UserService defines the interface for user use cases
+type UserService interface {
+	Login(ctx context.Context, req *valueobject.LoginRequest) (*valueobject.TokenResponse, error)
+	Logout(ctx context.Context) error
+	Register(ctx context.Context, req *valueobject.RegisterRequest) (*valueobject.TokenResponse, error)
+}
+
+type userService struct {
+	validator      interfaces.UserValidator
+	hasher         interfaces.PasswordHasher
+	repository     repository.UserRepository
+	tokenGenerator TokenGenerator
+	logger         logger.Logger
+}
+
+func NewUserService(
+	validator interfaces.UserValidator,
+	hasher interfaces.PasswordHasher,
+	repository repository.UserRepository,
+	tokenGenerator TokenGenerator,
+	logger logger.Logger,
+) UserService {
+	return &userService{
+		validator:      validator,
+		hasher:         hasher,
+		repository:     repository,
+		tokenGenerator: tokenGenerator,
+		logger:         logger,
 	}
 }
 
-func (s UserServiceImpl) UserLogin(
+func (s *userService) Login(
 	ctx context.Context,
-	req *valueobject.UserLoginReqest,
-) (*valueobject.UserTokenRespBody, error) {
+	req *valueobject.LoginRequest,
+) (*valueobject.TokenResponse, error) {
 	emailHash := fmt.Sprintf("%x", sha256.Sum256([]byte(req.Email)))[:12]
-	logger := log.Ctx(ctx).With().Str("emailHash", emailHash).Str("operation", "UserLogin").Logger()
-	logger.Info().Msg("User login attempt")
+	s.logger.Info(ctx, "User login attempt",
+		logger.String("emailHash", emailHash),
+		logger.String("operation", "Login"))
 
-	user, err := s.userRepository.FindByEmail(req.Email)
+	user, err := s.repository.FindByEmail(ctx, req.Email)
 	if err != nil {
-		logger.Warn().Err(err).Msg("User lookup failed")
-		return nil, err
+		s.logger.Warn(ctx, "User lookup failed",
+			logger.String("emailHash", emailHash),
+			logger.Error(err))
+		return nil, errors.UnauthorizedError("invalid email or password")
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	if err := user.VerifyPassword(req.Password, s.hasher); err != nil {
+		s.logger.Warn(ctx, "Password verification failed",
+			logger.String("emailHash", emailHash))
+		return nil, errors.UnauthorizedError("invalid email or password")
+	}
+
+	tokenType, token, err := s.tokenGenerator.GenerateToken(user.ID())
 	if err != nil {
-		logger.Warn().Msg("Password verification failed")
-		return nil, errors.Unauthorized("cannot find user with given email & password")
+		s.logger.Error(ctx, "Token generation failed",
+			logger.String("userID", user.ID()),
+			logger.Error(err))
+		return nil, errors.InternalError("token generation failed")
 	}
 
-	userToken := s.jwtAuth.SignRSA(jwt.MapClaims{
-		"id": user.ID,
-	})
-
-	tokenRes := valueobject.UserTokenRespBody{
-		Type:  userToken.Type,
-		Token: userToken.Token,
+	tokenRes := &valueobject.TokenResponse{
+		Type:  tokenType,
+		Token: token,
 	}
 
-	logger.Info().Str("userId", user.ID).Msg("Login successful")
-	return &tokenRes, nil
+	s.logger.Info(ctx, "Login successful",
+		logger.String("userID", user.ID()))
+	return tokenRes, nil
 }
 
-func (s UserServiceImpl) UserLogout(ctx context.Context) error {
+func (s *userService) Logout(ctx context.Context) error {
 	return nil
 }
 
-func (s UserServiceImpl) UserRegister(
+func (s *userService) Register(
 	ctx context.Context,
-	req *valueobject.UserRegisterRequest,
-) (*valueobject.UserTokenRespBody, error) {
-	uuid := utils.GenerateRandomUUID()
+	req *valueobject.RegisterRequest,
+) (*valueobject.TokenResponse, error) {
 
-	bcryptPass, err := utils.BcryptString(req.Password)
-
+	// Check if user already exists
+	exists, err := s.repository.ExistsByEmail(ctx, req.Email)
 	if err != nil {
-		return nil, err
-	} else {
-		req.Password = bcryptPass
+		s.logger.Error(ctx, "Error checking user existence",
+			logger.String("operation", "Register"),
+			logger.Error(err))
+		return nil, errors.InternalError("database query failed")
+	}
+	if exists {
+		return nil, errors.ConflictError("email already registered")
 	}
 
-	user, err := s.userRepository.CreateUser(req, uuid)
+	// Generate UUID for new user
+	userID := utils.GenerateRandomUUID()
+
+	// Create new user entity (validation and password hashing happen in domain)
+	user, err := entity.NewUser(userID, req.Email, req.Password, req.Name, s.validator, s.hasher)
 	if err != nil {
-		return nil, err
+		s.logger.Warn(ctx, "User validation failed",
+			logger.String("operation", "Register"),
+			logger.Error(err))
+		return nil, errors.ValidationError(err.Error())
 	}
 
-	userToken := s.jwtAuth.SignRSA(jwt.MapClaims{
-		"id": user.ID,
-	})
-
-	tokenRes := valueobject.UserTokenRespBody{
-		Type:  userToken.Type,
-		Token: userToken.Token,
+	// Save user
+	savedUser, err := s.repository.Save(ctx, user)
+	if err != nil {
+		s.logger.Error(ctx, "Failed to save user",
+			logger.String("operation", "Register"),
+			logger.Error(err))
+		return nil, errors.InternalError("save operation failed")
 	}
 
-	return &tokenRes, nil
+	// Generate token
+	tokenType, token, err := s.tokenGenerator.GenerateToken(savedUser.ID())
+	if err != nil {
+		s.logger.Error(ctx, "Token generation failed",
+			logger.String("userID", savedUser.ID()),
+			logger.Error(err))
+		return nil, errors.InternalError("token generation failed")
+	}
+
+	s.logger.Info(ctx, "User registered successfully",
+		logger.String("userID", savedUser.ID()))
+
+	return &valueobject.TokenResponse{
+		Type:  tokenType,
+		Token: token,
+	}, nil
 }

@@ -24,17 +24,17 @@ import (
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
 )
 
-type HttpRouterImpl struct {
-	handlers *handler.HttpHandlerImpl
+type Router struct {
+	handlers *handler.Handler
 }
 
-func NewHttpRoute(handlers *handler.HttpHandlerImpl) *HttpRouterImpl {
-	return &HttpRouterImpl{
+func New(handlers *handler.Handler) *Router {
+	return &Router{
 		handlers: handlers,
 	}
 }
 
-func (h *HttpRouterImpl) Router(r *chi.Mux) {
+func (h *Router) Router(r *chi.Mux) {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"shortly.praveengongada.com", "http://localhost:3001"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},

@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 )
 
 type (
@@ -36,6 +36,7 @@ func GracefulShutdown(
 	serverOp ServerOperation,
 	shutdownTimeout time.Duration,
 	operations map[string]Operation,
+	log logger.Logger,
 ) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -43,7 +44,7 @@ func GracefulShutdown(
 	errChan := make(chan error, 1)
 
 	go func() {
-		log.Info().Msg("Starting server...")
+		log.Info(context.Background(), "Starting server...")
 		if err := serverOp(); err != nil {
 			errChan <- err
 		}
@@ -53,36 +54,38 @@ func GracefulShutdown(
 	var oscall os.Signal
 	select {
 	case err := <-errChan:
-		log.Error().Err(err).Msg("Server error")
+		log.Error(context.Background(), "Server error", logger.Error(err))
 		return
 	case oscall = <-signalChan:
-		log.Info().Msgf("Received system call: %+v", oscall)
+		log.Info(context.Background(), "Received system call", logger.Any("signal", oscall))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	timeAfterExecuted := time.AfterFunc(shutdownTimeout, func() {
-		log.Warn().Msg("Force shutdown due to timeout")
+		log.Warn(context.Background(), "Force shutdown due to timeout")
 		os.Exit(1)
 	})
 	defer timeAfterExecuted.Stop()
 
 	if len(operations) > 0 {
-		log.Info().Msg("Executing shutdown operations...")
+		log.Info(context.Background(), "Executing shutdown operations...")
 		wg := sync.WaitGroup{}
 		wg.Add(len(operations))
 		for k, op := range operations {
 			go func(k string, op Operation) {
 				defer wg.Done()
-				log.Info().Msgf("Shutting down %s", k)
+				log.Info(ctx, "Shutting down component", logger.String("component", k))
 				if err := op(ctx); err != nil {
-					log.Error().Err(err).Msgf("Error shutting down %s", k)
+					log.Error(ctx, "Error shutting down component",
+						logger.String("component", k),
+						logger.Error(err))
 				}
 			}(k, op)
 		}
 		wg.Wait()
 	}
 
-	log.Info().Msg("Graceful shutdown completed")
+	log.Info(context.Background(), "Graceful shutdown completed")
 }

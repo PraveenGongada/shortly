@@ -18,213 +18,293 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog/log"
 
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/url/entity"
 	"github.com/PraveenGongada/shortly/internal/domain/url/repository"
-	"github.com/PraveenGongada/shortly/internal/domain/url/valueobject"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
-type UrlRepositoryImpl struct {
-	*PostgresStore
+type urlRepository struct {
+	store  Store
+	logger logger.Logger
 }
 
-func NewUrlRepository(db *PostgresStore) repository.UrlRepository {
-	return &UrlRepositoryImpl{
-		PostgresStore: db,
+// NewURLRepository creates a new URL repository implementation
+func NewURLRepository(store Store, logger logger.Logger) repository.URLRepository {
+	return &urlRepository{
+		store:  store,
+		logger: logger,
 	}
 }
 
-func (r UrlRepositoryImpl) CreateShortUrl(
-	id string,
-	userId string,
-	shortUrl string,
-	req *valueobject.CreateUrlRequest,
-) (*entity.Url, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+func (r *urlRepository) Save(ctx context.Context, url *entity.URL) (*entity.URL, error) {
 
-	query := `INSERT INTO "url" (id, user_id, short_url, long_url) VALUES ($1,$2,$3,$4) RETURNING id, user_id, short_url, long_url, redirects, created_at, updated_at`
+	query := `INSERT INTO "url" (id, user_id, short_url, long_url, redirects, created_at) 
+			  VALUES ($1, $2, $3, $4, $5, $6) 
+			  RETURNING id, user_id, short_url, long_url, redirects, created_at, updated_at`
 
-	url := &entity.Url{}
-	err := r.DB.QueryRow(ctx, query, id, userId, shortUrl, req.LongUrl).Scan(
-		&url.Id,
-		&url.UserID,
-		&url.ShortUrl,
-		&url.LongUrl,
-		&url.Redirects,
-		&url.CreatedAt,
-		&url.UpdatedAt,
+	var id, userID, shortCode, longURL string
+	var redirects int
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query,
+		url.ID(),
+		url.UserID(),
+		url.ShortCode(),
+		url.LongURL(),
+		url.Redirects(),
+		url.CreatedAt(),
+	).Scan(&id, &userID, &shortCode, &longURL, &redirects, &createdAt, &updatedAt)
+
+	if err != nil {
+		r.logger.Error(ctx, "Error saving URL", 
+			logger.String("urlId", url.ID()),
+			logger.String("operation", "Save"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
+	}
+
+	savedURL := entity.NewURLFromRepository(id, userID, shortCode, longURL, redirects, createdAt, updatedAt)
+	r.logger.Info(ctx, "URL saved successfully",
+		logger.String("urlId", url.ID()),
+		logger.String("operation", "Save"))
+	return savedURL, nil
+}
+
+func (r *urlRepository) FindByShortCode(ctx context.Context, shortCode string) (*entity.URL, error) {
+
+	query := `SELECT id, user_id, short_url, long_url, redirects, created_at, updated_at 
+			  FROM "url" WHERE short_url = $1`
+
+	var id, userID, scannedShortCode, longURL string
+	var redirects int
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query, shortCode).Scan(
+		&id, &userID, &scannedShortCode, &longURL, &redirects, &createdAt, &updatedAt,
 	)
 
 	if err != nil {
-		return nil, errors.InternalServerError()
+		if err == pgx.ErrNoRows {
+			r.logger.Debug(ctx, "URL not found",
+				logger.String("shortCode", shortCode),
+				logger.String("operation", "FindByShortCode"))
+			return nil, errors.NotFoundError("URL not found")
+		}
+		r.logger.Error(ctx, "Error finding URL by short code",
+			logger.String("shortCode", shortCode),
+			logger.String("operation", "FindByShortCode"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
+
+	url := entity.NewURLFromRepository(id, userID, scannedShortCode, longURL, redirects, createdAt, updatedAt)
+	r.logger.Debug(ctx, "URL found successfully",
+		logger.String("shortCode", shortCode),
+		logger.String("operation", "FindByShortCode"))
 	return url, nil
 }
 
-func (r UrlRepositoryImpl) GetLongUrl(shortUrl string) (string, error) {
-	logger := log.With().Str("shortUrl", shortUrl).Str("operation", "GetLongUrl").Logger()
-	logger.Debug().Msg("Updating redirect count and retrieving long URL")
+func (r *urlRepository) FindByID(ctx context.Context, id string) (*entity.URL, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+	query := `SELECT id, user_id, short_url, long_url, redirects, created_at, updated_at 
+			  FROM "url" WHERE id = $1`
 
-	// Start a transaction to ensure atomicity
-	tx, err := r.DB.Begin(ctx)
-	if err != nil {
-		logger.Error().Err(err).Msg("Error starting transaction")
-		return "", errors.InternalServerError()
-	}
-	defer tx.Rollback(ctx)
-
-	// Update redirect count
-	updateAnalytics := `UPDATE url SET redirects=redirects+1 WHERE short_url=$1`
-	_, err = tx.Exec(ctx, updateAnalytics, shortUrl)
-	if err != nil {
-		logger.Error().Err(err).Msg("Error updating redirect count")
-		return "", errors.InternalServerError()
-	}
-
-	// Get long URL
-	var longUrl string
-	query := `SELECT long_url FROM "url" WHERE short_url = $1`
-	err = tx.QueryRow(ctx, query, shortUrl).Scan(&longUrl)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			logger.Warn().Msg("Short URL not found")
-			return "", errors.NotFound("URL not found")
-		}
-		logger.Error().Err(err).Msg("Error retrieving long URL")
-		return "", errors.InternalServerError()
-	}
-
-	// Commit transaction
-	if err = tx.Commit(ctx); err != nil {
-		logger.Error().Err(err).Msg("Error committing transaction")
-		return "", errors.InternalServerError()
-	}
-
-	logger.Debug().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
-	return longUrl, nil
-}
-
-func (r UrlRepositoryImpl) GetAnalytics(shortUrl string, userId string) (int, error) {
-	logger := log.With().Str("shortUrl", shortUrl).Str("userId", userId).Str("operation", "GetAnalytics").Logger()
-
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
-
-	query := `SELECT user_id, redirects FROM url WHERE short_url = $1`
-
-	var user string
+	var urlID, userID, shortCode, longURL string
 	var redirects int
-	err := r.DB.QueryRow(ctx, query, shortUrl).Scan(&user, &redirects)
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.store.Pool().QueryRow(ctx, query, id).Scan(
+		&urlID, &userID, &shortCode, &longURL, &redirects, &createdAt, &updatedAt,
+	)
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			logger.Debug().Msg("URL not found for analytics")
-			return -1, errors.NotFound("URL not found")
+			r.logger.Debug(ctx, "URL not found",
+				logger.String("urlId", id),
+				logger.String("operation", "FindByID"))
+			return nil, errors.NotFoundError("URL not found")
 		}
-		logger.Error().Err(err).Msg("Error retrieving analytics data")
-		return -1, errors.InternalServerError()
+		r.logger.Error(ctx, "Error finding URL by ID",
+			logger.String("urlId", id),
+			logger.String("operation", "FindByID"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 
-	if user != userId {
-		logger.Warn().Msg("Unauthorized analytics access attempt")
-		return -1, errors.Unauthorized("unauthorized request")
-	}
-
-	return redirects, nil
+	url := entity.NewURLFromRepository(urlID, userID, shortCode, longURL, redirects, createdAt, updatedAt)
+	r.logger.Debug(ctx, "URL found successfully",
+		logger.String("urlId", id),
+		logger.String("operation", "FindByID"))
+	return url, nil
 }
 
-func (r *UrlRepositoryImpl) GetPaginatedUrls(
-	userId string,
-	limit int,
-	offset int,
-) ([]entity.Url, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+func (r *urlRepository) FindByUserID(ctx context.Context, userID string, limit, offset int) ([]*entity.URL, error) {
 
-	query := `
-        SELECT id, short_url, long_url, redirects 
-        FROM url 
-        WHERE user_id = $1 
-        ORDER BY created_at DESC 
-        LIMIT $2 OFFSET $3`
+	query := `SELECT id, user_id, short_url, long_url, redirects, created_at, updated_at 
+			  FROM "url" 
+			  WHERE user_id = $1 
+			  ORDER BY created_at DESC 
+			  LIMIT $2 OFFSET $3`
 
-	rows, err := r.DB.Query(ctx, query, userId, limit, offset)
+	rows, err := r.store.Pool().Query(ctx, query, userID, limit, offset)
 	if err != nil {
-		log.Err(err).Msg("Error in GetPaginatedUrls -> Repository")
-		return nil, errors.InternalServerError()
+		r.logger.Error(ctx, "Error querying URLs by user ID",
+			logger.String("userId", userID),
+			logger.Int("limit", limit),
+			logger.Int("offset", offset),
+			logger.String("operation", "FindByUserID"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 	defer rows.Close()
 
-	urls := make([]entity.Url, 0, limit)
+	var urls []*entity.URL
 
 	for rows.Next() {
-		var url entity.Url
+		var id, uid, shortCode, longURL string
 		var redirects int
+		var createdAt time.Time
+		var updatedAt *time.Time
 
-		err := rows.Scan(&url.Id, &url.ShortUrl, &url.LongUrl, &redirects)
+		err := rows.Scan(&id, &uid, &shortCode, &longURL, &redirects, &createdAt, &updatedAt)
 		if err != nil {
-			log.Err(err).Str("layer", "repository").Msg("Error scanning row in GetPaginatedUrls")
-			return nil, errors.InternalServerError()
+			r.logger.Error(ctx, "Error scanning URL row",
+				logger.String("userId", userID),
+				logger.String("operation", "FindByUserID"),
+				logger.Error(err))
+			return nil, errors.InternalError("database operation failed")
 		}
-		url.Redirects = redirects
+
+		url := entity.NewURLFromRepository(id, uid, shortCode, longURL, redirects, createdAt, updatedAt)
 		urls = append(urls, url)
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Err(err).Str("layer", "repository").Msg("Error with rows in GetPaginatedUrls")
-		return nil, errors.InternalServerError()
+		r.logger.Error(ctx, "Error iterating URL rows",
+			logger.String("userId", userID),
+			logger.String("operation", "FindByUserID"),
+			logger.Error(err))
+		return nil, errors.InternalError("database operation failed")
 	}
 
+	r.logger.Debug(ctx, "URLs found successfully",
+		logger.String("userId", userID),
+		logger.Int("count", len(urls)),
+		logger.String("operation", "FindByUserID"))
 	return urls, nil
 }
 
-func (r UrlRepositoryImpl) UpdateUrl(urlId string, newUrl string) error {
-	logger := log.With().Str("urlId", urlId).Str("operation", "UpdateUrl").Logger()
+func (r *urlRepository) ExistsByShortCode(ctx context.Context, shortCode string) (bool, error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+	query := `SELECT EXISTS(SELECT 1 FROM "url" WHERE short_url = $1)`
 
-	query := `UPDATE url SET long_url=$1 WHERE id=$2`
-
-	cmdTag, err := r.DB.Exec(ctx, query, newUrl, urlId)
+	var exists bool
+	err := r.store.Pool().QueryRow(ctx, query, shortCode).Scan(&exists)
 	if err != nil {
-		logger.Error().Err(err).Msg("Error updating URL")
-		return errors.InternalServerError()
+		r.logger.Error(ctx, "Error checking if short code exists",
+			logger.String("shortCode", shortCode),
+			logger.String("operation", "ExistsByShortCode"),
+			logger.Error(err))
+		return false, errors.InternalError("database operation failed")
+	}
+
+	return exists, nil
+}
+
+func (r *urlRepository) Update(ctx context.Context, url *entity.URL) error {
+
+	query := `UPDATE "url" 
+			  SET long_url = $1, updated_at = $2 
+			  WHERE id = $3`
+
+	cmdTag, err := r.store.Pool().Exec(ctx, query,
+		url.LongURL(),
+		time.Now().UTC(),
+		url.ID(),
+	)
+
+	if err != nil {
+		r.logger.Error(ctx, "Error updating URL",
+			logger.String("urlId", url.ID()),
+			logger.String("operation", "Update"),
+			logger.Error(err))
+		return errors.InternalError("database operation failed")
 	}
 
 	if cmdTag.RowsAffected() == 0 {
-		logger.Debug().Msg("URL not found for update")
-		return errors.NotFound("URL not found")
+		r.logger.Debug(ctx, "URL not found for update",
+			logger.String("urlId", url.ID()),
+			logger.String("operation", "Update"))
+		return errors.NotFoundError("URL not found")
 	}
 
+	r.logger.Info(ctx, "URL updated successfully",
+		logger.String("urlId", url.ID()),
+		logger.String("operation", "Update"))
 	return nil
 }
 
-func (r UrlRepositoryImpl) DeleteUrl(urlId string, userId string) error {
-	logger := log.With().Str("urlId", urlId).Str("userId", userId).Str("operation", "DeleteUrl").Logger()
+func (r *urlRepository) Delete(ctx context.Context, id, userID string) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), r.GetQueryTimeout())
-	defer cancel()
+	query := `DELETE FROM "url" WHERE id = $1 AND user_id = $2`
 
-	query := `DELETE FROM url WHERE id=$1 AND user_id=$2`
-
-	cmdTag, err := r.DB.Exec(ctx, query, urlId, userId)
+	cmdTag, err := r.store.Pool().Exec(ctx, query, id, userID)
 	if err != nil {
-		logger.Error().Err(err).Msg("Error deleting URL")
-		return errors.InternalServerError()
+		r.logger.Error(ctx, "Error deleting URL",
+			logger.String("urlId", id),
+			logger.String("userId", userID),
+			logger.String("operation", "Delete"),
+			logger.Error(err))
+		return errors.InternalError("database operation failed")
 	}
 
 	if cmdTag.RowsAffected() == 0 {
-		logger.Debug().Msg("URL not found for deletion or unauthorized")
-		return errors.Unauthorized("Cannot delete the url")
+		r.logger.Debug(ctx, "URL not found for deletion or unauthorized",
+			logger.String("urlId", id),
+			logger.String("userId", userID),
+			logger.String("operation", "Delete"))
+		return errors.NotFoundError("URL not found or not authorized")
 	}
 
+	r.logger.Info(ctx, "URL deleted successfully",
+		logger.String("urlId", id),
+		logger.String("userId", userID),
+		logger.String("operation", "Delete"))
+	return nil
+}
+
+func (r *urlRepository) IncrementRedirects(ctx context.Context, shortCode string) error {
+
+	query := `UPDATE "url" 
+			  SET redirects = redirects + 1, updated_at = $1 
+			  WHERE short_url = $2`
+
+	cmdTag, err := r.store.Pool().Exec(ctx, query, time.Now().UTC(), shortCode)
+	if err != nil {
+		r.logger.Error(ctx, "Error incrementing redirects",
+			logger.String("shortCode", shortCode),
+			logger.String("operation", "IncrementRedirects"),
+			logger.Error(err))
+		return errors.InternalError("database operation failed")
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		r.logger.Debug(ctx, "URL not found for redirect increment",
+			logger.String("shortCode", shortCode),
+			logger.String("operation", "IncrementRedirects"))
+		return errors.NotFoundError("URL not found")
+	}
+
+	r.logger.Debug(ctx, "Redirects incremented successfully",
+		logger.String("shortCode", shortCode),
+		logger.String("operation", "IncrementRedirects"))
 	return nil
 }

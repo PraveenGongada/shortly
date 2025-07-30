@@ -22,11 +22,9 @@ import (
 	"github.com/PraveenGongada/shortly/internal/domain/user/valueobject"
 )
 
+// UserService defines use cases for user management
 type UserService interface {
-	UserLogin(ctx context.Context, req *valueobject.UserLoginReqest) (*valueobject.UserTokenRespBody, error)
-	UserLogout(ctx context.Context) error
-	UserRegister(
-		ctx context.Context,
-		req *valueobject.UserRegisterRequest,
-	) (*valueobject.UserTokenRespBody, error)
+	Login(ctx context.Context, req *valueobject.LoginRequest) (*valueobject.TokenResponse, error)
+	Logout(ctx context.Context) error
+	Register(ctx context.Context, req *valueobject.RegisterRequest) (*valueobject.TokenResponse, error)
 }

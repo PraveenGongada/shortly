@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	domainErrors "github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
 type Response struct {
@@ -45,16 +45,29 @@ func Text(w http.ResponseWriter, httpCode int, message string) {
 }
 
 func Err(w http.ResponseWriter, err error) {
-	_, ok := err.(*errors.ErrorResp)
-	if !ok {
-		err = errors.InternalServerError()
-	}
+	// Map domain errors to HTTP status codes
+	statusCode, message := mapDomainErrorToHTTP(err)
+	Json(w, statusCode, message, nil)
+}
 
-	er, _ := err.(*errors.ErrorResp)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(er.Code)
-	res := Response{
-		Message: &er.Message,
+// mapDomainErrorToHTTP converts domain errors to HTTP status codes and messages
+func mapDomainErrorToHTTP(err error) (int, string) {
+	errorType := domainErrors.GetErrorType(err)
+
+	switch errorType {
+	case domainErrors.ErrorTypeValidation:
+		return http.StatusBadRequest, err.Error()
+	case domainErrors.ErrorTypeNotFound:
+		return http.StatusNotFound, err.Error()
+	case domainErrors.ErrorTypeConflict:
+		return http.StatusConflict, err.Error()
+	case domainErrors.ErrorTypeUnauthorized:
+		return http.StatusUnauthorized, err.Error()
+	case domainErrors.ErrorTypeForbidden:
+		return http.StatusForbidden, err.Error()
+	case domainErrors.ErrorTypeInternal:
+		return http.StatusInternalServerError, "Something went wrong!"
+	default:
+		return http.StatusInternalServerError, "Something went wrong!"
 	}
-	json.NewEncoder(w).Encode(res)
 }

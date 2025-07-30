@@ -21,12 +21,16 @@ import (
 
 	_ "github.com/PraveenGongada/shortly/docs"
 	"github.com/PraveenGongada/shortly/internal/application/service"
+	urlDomainService "github.com/PraveenGongada/shortly/internal/domain/url/service"
+	userDomainService "github.com/PraveenGongada/shortly/internal/domain/user/service"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/auth"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/cache/redis"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/http/cookie"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/logging"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/logging/zerolog"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/persistence/postgres"
 	"github.com/PraveenGongada/shortly/internal/shared/graceful"
 )
@@ -46,34 +50,67 @@ import (
 // @host localhost:8080
 // @BasePath /api
 func main() {
-	logging.InitLogger()
+	// Load configuration and create adapters
+	cfg := config.GetGlobalConfig()
+	secrets := config.GetGlobalSecrets()
+	logConfig := config.NewLogConfigAdapter(cfg)
+	dbConfig := config.NewDatabaseConfigAdapter(cfg, secrets)
+	authConfig := config.NewAuthConfigAdapter(cfg, secrets)
+	urlConfig := config.NewURLConfigAdapter(cfg)
+	serverConfig := config.NewServerConfigAdapter(cfg)
+	
+	// Initialize logger with config
+	logger := zerolog.InitLogger(logConfig)
+	
+	// Initialize domain logger adapter
+	domainLogger := zerolog.NewWithLogger(logger)
 
-	postgresClient := postgres.NewPostgresClient()
-	jwtAuth := auth.NewJwt()
+	// Initialize infrastructure layer
+	postgresClient := postgres.NewPostgresClient(domainLogger, dbConfig)
+	redisClient := redis.NewClient()
+	tokenGenerator := auth.NewJwtTokenGenerator(domainLogger, authConfig)
+	cookieManager := cookie.NewCookieManager(authConfig)
 
-	// Repositories
-	userRepository := postgres.NewUserRepository(postgresClient)
-	urlRepository := postgres.NewUrlRepository(postgresClient)
+	// Initialize cache
+	urlCache := redis.NewURLCache(redisClient)
 
-	// Services
-	userService := service.NewUserService(jwtAuth, userRepository)
-	urlService := service.NewUrlService(urlRepository)
+	// Initialize domain services
+	urlGenerator := urlDomainService.NewGenerator(urlConfig.ShortURLLength())
+	urlValidator := urlDomainService.NewValidator()
+	userValidator := userDomainService.NewValidator()
+	userHasher := userDomainService.NewHasher()
 
-	// HTTP Layer
-	handlers := handler.NewHttpHandler(userService, urlService)
-	router := router.NewHttpRoute(handlers)
-	server := http.NewHttpProtocol(router)
+	// Initialize repositories (infrastructure implementations of domain interfaces)
+	userRepository := postgres.NewUserRepository(postgresClient, domainLogger)
+	urlRepository := postgres.NewURLRepository(postgresClient, domainLogger)
 
-	// Set up graceful shutdown with the server operation
+	// Initialize application services (use case implementations)
+	userService := service.NewUserService(userValidator, userHasher, userRepository, tokenGenerator, domainLogger)
+	urlService := service.NewURLService(
+		urlGenerator,
+		urlValidator,
+		urlRepository,
+		urlCache,
+		domainLogger,
+		urlConfig.MaxCollisionRetries(),
+	)
+
+	// Initialize HTTP layer
+	handlers := handler.New(userService, urlService, cookieManager, domainLogger, authConfig)
+	routerInstance := router.New(handlers)
+	server := http.New(routerInstance, domainLogger, serverConfig)
+
+	// Set up graceful shutdown with proper context handling
 	graceful.GracefulShutdown(
 		func() error {
 			return server.Listen()
 		},
-		config.Get().Application.Graceful.MaxSecond,
+		serverConfig.GracefulShutdownTimeout(),
 		map[string]graceful.Operation{
 			"http": func(ctx context.Context) error {
 				return server.Shutdown(ctx)
 			},
 		},
+		domainLogger,
 	)
 }

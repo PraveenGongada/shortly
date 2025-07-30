@@ -22,43 +22,47 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rs/zerolog/log"
 
-	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
 )
 
-type HttpImpl struct {
-	HttpRouter *router.HttpRouterImpl
-	httpServer *http.Server
+type Server struct {
+	HttpRouter   *router.Router
+	httpServer   *http.Server
+	logger       logger.Logger
+	serverConfig config.ServerConfig
 }
 
-func NewHttpProtocol(HttpRouter *router.HttpRouterImpl) *HttpImpl {
-	return &HttpImpl{
-		HttpRouter: HttpRouter,
+func New(HttpRouter *router.Router, log logger.Logger, serverConfig config.ServerConfig) *Server {
+	return &Server{
+		HttpRouter:   HttpRouter,
+		logger:       log,
+		serverConfig: serverConfig,
 	}
 }
 
-func (r *HttpImpl) setupRouter(app *chi.Mux) {
+func (r *Server) setupRouter(app *chi.Mux) {
 	r.HttpRouter.Router(app)
 }
 
-func (p *HttpImpl) Listen() error {
+func (p *Server) Listen() error {
 	app := chi.NewRouter()
 
 	p.setupRouter(app)
 
-	serverPort := fmt.Sprintf(":%d", config.Get().Application.Port)
+	serverPort := fmt.Sprintf(":%d", p.serverConfig.Port())
 	p.httpServer = &http.Server{
 		Addr:    serverPort,
 		Handler: app,
 	}
 
-	log.Info().Msgf("Server started on Port %s ", serverPort)
+	p.logger.Info(context.Background(), "Server started on port", logger.String("port", serverPort))
 	return p.httpServer.ListenAndServe()
 }
 
-func (p *HttpImpl) Shutdown(ctx context.Context) error {
+func (p *Server) Shutdown(ctx context.Context) error {
 	if err := p.httpServer.Shutdown(ctx); err != nil {
 		return err
 	}

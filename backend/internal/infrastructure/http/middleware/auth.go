@@ -23,104 +23,106 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rs/zerolog/log"
 
-	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/response"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
-	"github.com/PraveenGongada/shortly/internal/shared/rsa"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
-func JwtVerifyToken(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := log.Ctx(r.Context()).With().Str("middleware", "JwtVerifyToken").Logger()
-		logger.Debug().Msg("Verifying JWT token")
+func JwtAuth(log logger.Logger, authConfig config.AuthConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Debug(r.Context(), "Verifying JWT token",
+				logger.String("middleware", "JwtVerifyToken"))
 
-		var JwtToken string
+			var JwtToken string
 
-		// Extract Bearer token from Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			JwtToken = strings.TrimPrefix(authHeader, "Bearer ")
-			logger.Debug().Msg("Token found in Authorization header")
-		}
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				JwtToken = strings.TrimPrefix(authHeader, "Bearer ")
+				log.Debug(r.Context(), "Token found in Authorization header",
+					logger.String("middleware", "JwtVerifyToken"))
+			}
 
-		// If Authorization header is missing, check cookie
-		if JwtToken == "" {
-			cookie, err := r.Cookie("token")
-			if err != nil || cookie.Value == "" {
-				logger.Warn().Err(err).Msg("No token found in request")
-				response.Json(w, http.StatusUnauthorized, "Token is empty", nil)
+			if JwtToken == "" {
+				cookie, err := r.Cookie("token")
+				if err != nil || cookie.Value == "" {
+					log.Warn(r.Context(), "No token found in request",
+						logger.String("middleware", "JwtVerifyToken"),
+						logger.Error(err))
+					response.Json(w, http.StatusUnauthorized, "Token is empty", nil)
+					return
+				}
+				JwtToken = cookie.Value
+				log.Debug(r.Context(), "Token found in cookie",
+					logger.String("middleware", "JwtVerifyToken"))
+			}
+
+			token, err := jwt.Parse(JwtToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+					log.Warn(r.Context(), "Unexpected signing method",
+						logger.String("middleware", "JwtVerifyToken"),
+						logger.String("method", token.Header["alg"].(string)))
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+
+				publicRsa := authConfig.GetRSAPublicKey()
+				if publicRsa == nil {
+					log.Error(r.Context(), "RSA public key is not configured",
+						logger.String("middleware", "JwtVerifyToken"))
+					return nil, errors.InternalError("RSA key configuration error")
+				}
+				return publicRsa, nil
+			})
+
+			if err != nil || !token.Valid {
+				log.Warn(r.Context(), "Token is not valid",
+					logger.String("middleware", "JwtVerifyToken"),
+					logger.Error(err))
+				response.Json(w, http.StatusUnauthorized, "Token is not valid", nil)
 				return
 			}
-			JwtToken = cookie.Value
-			logger.Debug().Msg("Token found in cookie")
-		}
 
-		// Parse JWT token
-		token, err := jwt.Parse(JwtToken, func(token *jwt.Token) (interface{}, error) {
-			// Ensure signing method is RSA
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				logger.Warn().
-					Str("method", token.Header["alg"].(string)).
-					Msg("Unexpected signing method")
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				log.Warn(r.Context(), "Invalid token claims format",
+					logger.String("middleware", "JwtVerifyToken"))
+				response.Json(w, http.StatusUnauthorized, "Invalid token claims", nil)
+				return
 			}
 
-			// Load RSA public key
-			publicRsa, err := rsa.ReadPublicKeyFromEnv(config.Get().Application.Key.Rsa.Public)
-			if err != nil {
-				log.Err(err).Msg("Error reading RSA public key from env")
-				return nil, errors.InternalServerError()
+			id, ok := claims["id"].(string)
+			if !ok || id == "" {
+				log.Warn(r.Context(), "User ID not found in token",
+					logger.String("middleware", "JwtVerifyToken"))
+				response.Json(w, http.StatusUnauthorized, "ID not found", nil)
+				return
 			}
-			return publicRsa, nil
+
+			rawExp, ok := claims["exp"].(float64)
+			if !ok {
+				log.Warn(r.Context(), "Expiration time missing or invalid",
+					logger.String("middleware", "JwtVerifyToken"))
+				response.Json(w, http.StatusUnauthorized, "Expiration time missing or invalid", nil)
+				return
+			}
+			exp := int64(rawExp)
+			if exp < time.Now().Unix() {
+				log.Warn(r.Context(), "Token has expired",
+					logger.String("middleware", "JwtVerifyToken"),
+					logger.Any("expired", time.Unix(exp, 0)),
+					logger.Any("now", time.Now()))
+				response.Json(w, http.StatusUnauthorized, "Token has expired", nil)
+				return
+			}
+
+			r.Header.Set("id", id)
+			log.Info(r.Context(), "JWT token validated successfully",
+				logger.String("middleware", "JwtVerifyToken"),
+				logger.String("userId", id))
+
+			next.ServeHTTP(w, r)
 		})
-
-		// Validate token
-		if err != nil || !token.Valid {
-			log.Warn().Msg("Token is not valid")
-			response.Json(w, http.StatusUnauthorized, "Token is not valid", nil)
-			return
-		}
-
-		// Extract claims safely
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			logger.Warn().Msg("Invalid token claims format")
-			response.Json(w, http.StatusUnauthorized, "Invalid token claims", nil)
-			return
-		}
-
-		// Extract user ID
-		id, ok := claims["id"].(string)
-		if !ok || id == "" {
-			logger.Warn().Msg("User ID not found in token")
-			response.Json(w, http.StatusUnauthorized, "ID not found", nil)
-			return
-		}
-
-		// Check expiration time
-		rawExp, ok := claims["exp"].(float64)
-		if !ok {
-			logger.Warn().Msg("Expiration time missing or invalid")
-			response.Json(w, http.StatusUnauthorized, "Expiration time missing or invalid", nil)
-			return
-		}
-		exp := int64(rawExp)
-		if exp < time.Now().Unix() {
-			logger.Warn().
-				Time("expired", time.Unix(exp, 0)).
-				Time("now", time.Now()).
-				Msg("Token has expired")
-			response.Json(w, http.StatusUnauthorized, "Token has expired", nil)
-			return
-		}
-
-		// Set user ID in request header for next handler
-		r.Header.Set("id", id)
-		logger.Info().Str("userId", id).Msg("JWT token validated successfully")
-
-		// Proceed with the next handler
-		next.ServeHTTP(w, r)
-	})
+	}
 }

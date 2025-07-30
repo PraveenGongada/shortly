@@ -20,14 +20,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rs/zerolog/log"
 
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/url/valueobject"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/response"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
 // CreateShortUrl godoc
@@ -43,36 +42,34 @@ import (
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /url/create [post]
-func (h HttpHandlerImpl) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
-	logger := log.Ctx(r.Context()).With().Str("handler", "CreateShortUrl").Logger()
-
-	req := &valueobject.CreateUrlRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-
-	validUrl := strings.TrimSpace(req.LongUrl) != "" || strings.HasPrefix(req.LongUrl, "http") ||
-		strings.HasPrefix(req.LongUrl, "https")
-
-	if err != nil || !validUrl {
-		logger.Warn().Err(err).Str("longUrl", req.LongUrl).Msg("Invalid request payload")
-		response.Err(w, errors.BadRequest("Invalid Request"))
+func (h *Handler) CreateShortURL(w http.ResponseWriter, r *http.Request) {
+	var req valueobject.CreateURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Warn(r.Context(), "Invalid request payload",
+			logger.String("handler", "CreateShortUrl"),
+			logger.Error(err))
+		response.Err(w, errors.ValidationError("Invalid request format"))
 		return
 	}
 
-	userId := r.Header.Get("id")
+	userID := r.Header.Get("id")
 
-	urlResponse, err := h.urlService.CreateShortUrl(r.Context(), userId, req)
+	urlResponse, err := h.urlService.CreateShortURL(r.Context(), userID, &req)
 	if err != nil {
-		logger.Error().Err(err).Msg("Service layer error creating short URL")
+		h.logger.Error(r.Context(), "Service layer error creating short URL",
+			logger.String("handler", "CreateShortUrl"),
+			logger.String("userID", userID),
+			logger.Error(err))
 		response.Err(w, err)
 		return
 	}
 
-	logger.Info().
-		Str("shortUrl", urlResponse.ShortUrl).
-		Str("urlId", urlResponse.Id).
-		Msg("Short URL creation request completed successfully")
+	h.logger.Info(r.Context(), "Short URL created",
+		logger.String("handler", "CreateShortUrl"),
+		logger.String("shortCode", urlResponse.ShortCode),
+		logger.String("urlID", urlResponse.ID))
 
-	response.Json(w, http.StatusCreated, "Short url created successfully", urlResponse)
+	response.Json(w, http.StatusCreated, "Short URL created successfully", urlResponse)
 }
 
 // RedirectUser godoc
@@ -85,28 +82,28 @@ func (h HttpHandlerImpl) CreateShortUrl(w http.ResponseWriter, r *http.Request) 
 // @Failure 404 {object} response.Response "URL not found"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /{shortUrl} [get]
-func (h HttpHandlerImpl) RedirectUser(w http.ResponseWriter, r *http.Request) {
-	shortUrl := chi.URLParam(r, "shortUrl")
+func (h *Handler) RedirectUser(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortUrl")
 
-	logger := log.Ctx(r.Context()).
-		With().
-		Str("handler", "RedirectUser").
-		Str("shortUrl", shortUrl).
-		Logger()
-
-	if shortUrl == "favicon.ico" {
+	if shortCode == "favicon.ico" {
 		return
 	}
 
-	longUrl, err := h.urlService.GetLongUrl(r.Context(), shortUrl)
+	longURL, err := h.urlService.GetOriginalURL(r.Context(), shortCode)
 	if err != nil {
-		logger.Warn().Err(err).Msg("Redirect failed - URL not found or error")
+		h.logger.Warn(r.Context(), "Redirect failed",
+			logger.String("handler", "RedirectUser"),
+			logger.String("shortCode", shortCode),
+			logger.Error(err))
 		response.Err(w, err)
 		return
 	}
 
-	logger.Info().Str("longUrl", longUrl).Msg("Redirect successful")
-	http.Redirect(w, r, longUrl, http.StatusFound)
+	h.logger.Info(r.Context(), "Redirected",
+		logger.String("handler", "RedirectUser"),
+		logger.String("shortCode", shortCode),
+		logger.String("longURL", longURL))
+	http.Redirect(w, r, longURL, http.StatusFound)
 }
 
 // GetLongUrl godoc
@@ -119,16 +116,16 @@ func (h HttpHandlerImpl) RedirectUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} response.Response "URL not found"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /{shortUrl} [get]
-func (h HttpHandlerImpl) GetLongUrl(w http.ResponseWriter, r *http.Request) {
-	shortUrl := chi.URLParam(r, "shortUrl")
+func (h *Handler) GetLongURL(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortUrl")
 
-	longUrl, err := h.urlService.GetLongUrl(r.Context(), shortUrl)
+	longURL, err := h.urlService.GetOriginalURL(r.Context(), shortCode)
 	if err != nil {
 		response.Err(w, err)
 		return
 	}
 
-	response.Json(w, http.StatusOK, "success!", longUrl)
+	response.Json(w, http.StatusOK, "success!", longURL)
 }
 
 // GetAnalytics godoc
@@ -143,11 +140,11 @@ func (h HttpHandlerImpl) GetLongUrl(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} response.Response "URL not found"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /url/analytics/{shortUrl} [get]
-func (h HttpHandlerImpl) GetAnalytics(w http.ResponseWriter, r *http.Request) {
-	shortUrl := chi.URLParam(r, "shortUrl")
-	userId := r.Header.Get("id")
+func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortUrl")
+	userID := r.Header.Get("id")
 
-	count, err := h.urlService.GetAnalytics(r.Context(), shortUrl, userId)
+	count, err := h.urlService.GetAnalytics(r.Context(), shortCode, userID)
 	if err != nil {
 		response.Err(w, err)
 		return
@@ -169,29 +166,29 @@ func (h HttpHandlerImpl) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /urls [get]
-func (h HttpHandlerImpl) GetPaginatedUrls(w http.ResponseWriter, r *http.Request) {
-	userId := r.Header.Get("id")
+func (h *Handler) GetPaginatedURLs(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("id")
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
 	if offsetStr == "" || limitStr == "" {
-		response.Err(w, errors.BadRequest("limit & offset are required"))
+		response.Err(w, errors.ValidationError("limit & offset are required"))
 		return
 	}
 
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		response.Err(w, errors.BadRequest("error parsing offset"))
+		response.Err(w, errors.ValidationError("error parsing offset"))
 		return
 	}
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		response.Err(w, errors.BadRequest("error parsing limit"))
+		response.Err(w, errors.ValidationError("error parsing limit"))
 		return
 	}
 
-	urls, err := h.urlService.GetPaginatedUrls(r.Context(), userId, limit, offset)
+	urls, err := h.urlService.GetPaginatedURLs(r.Context(), userID, limit, offset)
 	if err != nil {
 		response.Err(w, err)
 		return
@@ -212,19 +209,19 @@ func (h HttpHandlerImpl) GetPaginatedUrls(w http.ResponseWriter, r *http.Request
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /url/update [patch]
-func (h HttpHandlerImpl) UpdateUrl(w http.ResponseWriter, r *http.Request) {
-	var updateRequest valueobject.UrlUpdateRequest
+func (h *Handler) UpdateURL(w http.ResponseWriter, r *http.Request) {
+	var updateRequest valueobject.URLUpdateRequest
+	userID := r.Header.Get("id")
 
-	err := json.NewDecoder(r.Body).Decode(&updateRequest)
-	if err != nil {
-		log.Err(err).Msg("Error")
-		response.Err(w, errors.BadRequest("Cannot parse update request"))
+	if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
+		response.Err(w, errors.ValidationError("Cannot parse update request"))
 		return
 	}
 
-	err = h.urlService.UpdateUrl(r.Context(), updateRequest.Id, updateRequest.Url)
+	err := h.urlService.UpdateURL(r.Context(), updateRequest.ID, userID, updateRequest.NewURL)
 	if err != nil {
 		response.Err(w, err)
+		return
 	}
 
 	response.Json(w, http.StatusOK, "success!", nil)
@@ -241,14 +238,15 @@ func (h HttpHandlerImpl) UpdateUrl(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
 // @Router /url/{urlId} [delete]
-func (h HttpHandlerImpl) DeleteUrl(w http.ResponseWriter, r *http.Request) {
-	urlId := chi.URLParam(r, "urlId")
-	userId := r.Header.Get("id")
+func (h *Handler) DeleteURL(w http.ResponseWriter, r *http.Request) {
+	urlID := chi.URLParam(r, "urlId")
+	userID := r.Header.Get("id")
 
-	err := h.urlService.DeleteUrl(r.Context(), urlId, userId)
+	err := h.urlService.DeleteURL(r.Context(), urlID, userID)
 	if err != nil {
 		response.Err(w, err)
+		return
 	}
 
-	response.Json(w, http.StatusOK, "success!", nil)
+	response.Json(w, http.StatusOK, "URL deleted successfully!", nil)
 }

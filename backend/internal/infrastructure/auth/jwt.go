@@ -17,72 +17,74 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rs/zerolog/log"
 
-	"github.com/PraveenGongada/shortly/internal/domain/user/valueobject"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
-	"github.com/PraveenGongada/shortly/internal/shared/rsa"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 )
 
-type JwtToken interface {
-	SignRSA(claims jwt.MapClaims) valueobject.Token
+// TokenGenerator defines interface for JWT token generation
+type TokenGenerator interface {
+	GenerateToken(userID string) (string, string, error) // returns type, token, error
 }
 
-type JwtTokenImpl struct {
-	jwtTokenTimeExp time.Duration
+// JwtTokenGenerator implements token generation using RSA
+type JwtTokenGenerator struct {
+	tokenExpiration time.Duration
+	logger          logger.Logger
+	authConfig      config.AuthConfig
 }
 
-func NewJwt() JwtToken {
-	jwtTokenDuration, err := time.ParseDuration(config.Get().Auth.JwtToken.Expired)
+// NewJwtTokenGenerator creates a new JWT token generator
+func NewJwtTokenGenerator(log logger.Logger, authConfig config.AuthConfig) TokenGenerator {
+	jwtTokenDuration, err := time.ParseDuration(authConfig.JWTTokenExpiry())
 	if err != nil {
-		log.Err(err).Msg(config.Get().Auth.JwtToken.Expired)
+		log.Error(context.Background(), "Invalid JWT token expiration config", logger.Error(err))
+		jwtTokenDuration = 24 * time.Hour // default to 24 hours
 	}
-	return &JwtTokenImpl{
-		jwtTokenTimeExp: jwtTokenDuration,
+	return &JwtTokenGenerator{
+		tokenExpiration: jwtTokenDuration,
+		authConfig:      authConfig,
+		logger:          log,
 	}
 }
 
-func (o JwtTokenImpl) SignRSA(claims jwt.MapClaims) valueobject.Token {
-	timeNow := time.Now()
-	tokenExpired := timeNow.Add(o.jwtTokenTimeExp).Unix()
-
-	if claims["id"] == nil {
-		return valueobject.Token{}
+func (g *JwtTokenGenerator) GenerateToken(userID string) (string, string, error) {
+	if userID == "" {
+		return "", "", errors.New("user ID cannot be empty")
 	}
+
+	timeNow := time.Now()
+	tokenExpired := timeNow.Add(g.tokenExpiration).Unix()
 
 	token := jwt.New(jwt.SigningMethodRS256)
-	// setup userdata
-	_, checkExp := claims["exp"]
-	_, checkIat := claims["iat"]
-
-	// if user didn't define claims expired
-	if !checkExp {
-		claims["exp"] = tokenExpired
+	claims := jwt.MapClaims{
+		"id":         userID,
+		"exp":        tokenExpired,
+		"iat":        timeNow.Unix(),
+		"token_type": "access_token",
 	}
-	// if user didn't define claims iat
-	if !checkIat {
-		claims["iat"] = timeNow.Unix()
-	}
-	claims["token_type"] = "access_token"
 
 	token.Claims = claims
-	authToken := new(valueobject.Token)
-	privateRsa, err := rsa.ReadPrivateKeyFromEnv(config.Get().Application.Key.Rsa.Private)
-	if err != nil {
-		log.Err(err).Msg("err read private key rsa from env")
-		return valueobject.Token{}
+
+	privateRsa := g.authConfig.GetRSAPrivateKey()
+	if privateRsa == nil {
+		g.logger.Error(context.Background(), "Private RSA key not available", 
+			logger.String("userID", userID))
+		return "", "", errors.New("private RSA key not configured")
 	}
+
 	tokenString, err := token.SignedString(privateRsa)
 	if err != nil {
-		log.Err(err).Msg("err read private rsa")
-		return valueobject.Token{}
+		g.logger.Error(context.Background(), "Error signing JWT token",
+			logger.String("userID", userID),
+			logger.Error(err))
+		return "", "", err
 	}
 
-	authToken.Token = tokenString
-	authToken.Type = "Bearer"
-
-	return *authToken
+	return g.authConfig.JWTTokenType(), tokenString, nil
 }

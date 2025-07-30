@@ -19,134 +19,252 @@ package service
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/rs/zerolog/log"
-
+	"github.com/PraveenGongada/shortly/internal/domain/interfaces"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
+	"github.com/PraveenGongada/shortly/internal/domain/url/cache"
 	"github.com/PraveenGongada/shortly/internal/domain/url/entity"
 	"github.com/PraveenGongada/shortly/internal/domain/url/repository"
-	urlService "github.com/PraveenGongada/shortly/internal/domain/url/service"
 	"github.com/PraveenGongada/shortly/internal/domain/url/valueobject"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
-	"github.com/PraveenGongada/shortly/internal/shared/errors"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 	"github.com/PraveenGongada/shortly/internal/shared/utils"
 )
 
-type UrlServiceImpl struct {
-	urlRepository repository.UrlRepository
+// URLService defines the interface for URL use cases
+type URLService interface {
+	CreateShortURL(ctx context.Context, userID string, req *valueobject.CreateURLRequest) (*valueobject.CreateURLResponse, error)
+	GetOriginalURL(ctx context.Context, shortCode string) (string, error)
+	GetAnalytics(ctx context.Context, shortCode string, userID string) (int, error)
+	GetPaginatedURLs(ctx context.Context, userID string, limit int, offset int) ([]valueobject.URLResponse, error)
+	UpdateURL(ctx context.Context, urlID string, userID string, newURL string) error
+	DeleteURL(ctx context.Context, urlID string, userID string) error
 }
 
-func NewUrlService(repo repository.UrlRepository) urlService.UrlService {
-	return &UrlServiceImpl{
-		urlRepository: repo,
+type urlService struct {
+	generator  interfaces.ShortCodeGenerator
+	validator  interfaces.URLValidator
+	repository repository.URLRepository
+	cache      cache.URLCache
+	logger     logger.Logger
+	maxRetries int
+}
+
+func NewURLService(
+	generator interfaces.ShortCodeGenerator,
+	validator interfaces.URLValidator,
+	repository repository.URLRepository,
+	cache cache.URLCache,
+	logger logger.Logger,
+	maxRetries int,
+) URLService {
+	if maxRetries <= 0 {
+		maxRetries = 5
+	}
+	return &urlService{
+		generator:  generator,
+		validator:  validator,
+		repository: repository,
+		cache:      cache,
+		logger:     logger,
+		maxRetries: maxRetries,
 	}
 }
 
-func (s UrlServiceImpl) CreateShortUrl(
+func (s *urlService) CreateShortURL(
 	ctx context.Context,
-	userId string,
-	req *valueobject.CreateUrlRequest,
-) (*valueobject.CreateUrlResponse, error) {
-	logger := log.Ctx(ctx).With().Str("userId", userId).Logger()
-	logger.Debug().Str("longUrl", req.LongUrl).Msg("Starting short URL creation")
+	userID string,
+	req *valueobject.CreateURLRequest,
+) (*valueobject.CreateURLResponse, error) {
+	s.logger.Debug(ctx, "Starting short URL creation", 
+		logger.String("userID", userID),
+		logger.String("longURL", req.LongURL))
 
-	maxCollisionRetries := config.Get().Application.MaxCollisionRetries
-
-	url, err := s.createShotUrlWithRetries(userId, maxCollisionRetries, req)
+	url, err := s.createShortURLWithRetries(ctx, userID, req, s.maxRetries)
 	if err != nil {
-		logger.Error().Err(err).Msg("Failed to create short URL after retries")
+		s.logger.Error(ctx, "Failed to create short URL after retries", logger.Error(err))
 		return nil, err
 	}
 
-	urlResponse := valueobject.CreateShortUrlResponse(url)
+	urlResponse := valueobject.CreateShortURLResponse(url)
 
-	logger.Info().
-		Str("shortUrl", url.ShortUrl).
-		Str("urlId", url.Id).
-		Msg("Short URL created successfully")
+	s.logger.Info(ctx, "Short URL created successfully",
+		logger.String("shortCode", url.ShortCode()),
+		logger.String("urlID", url.ID()))
 
 	return &urlResponse, nil
 }
 
-func (s UrlServiceImpl) createShotUrlWithRetries(
-	userId string,
-	retriesLeft int8,
-	req *valueobject.CreateUrlRequest,
-) (*entity.Url, error) {
+func (s *urlService) createShortURLWithRetries(
+	ctx context.Context,
+	userID string,
+	req *valueobject.CreateURLRequest,
+	retriesLeft int,
+) (*entity.URL, error) {
 	if retriesLeft <= 0 {
-		return nil, errors.InternalServerError()
+		return nil, errors.InternalError("max retries exceeded")
 	}
 
-	shortId := utils.GenerateShortId()
-	uuid := utils.GenerateRandomUUID()
-
-	shortUrl, err := s.urlRepository.CreateShortUrl(uuid, userId, shortId, req)
+	shortCode, err := s.generator.GenerateShortCode()
 	if err != nil {
-		pgErr, ok := err.(*pgconn.PgError)
-		if ok && pgErr.Code == "23505" { // unique_violation
-			return s.createShotUrlWithRetries(userId, retriesLeft-1, req)
-		} else {
-			return nil, errors.InternalServerError()
+		return nil, errors.InternalError("short code generation failed")
+	}
+
+	exists, err := s.repository.ExistsByShortCode(ctx, shortCode)
+	if err != nil {
+		return nil, errors.InternalError("database query failed")
+	}
+	if exists {
+		// Retry with a new short code
+		return s.createShortURLWithRetries(ctx, userID, req, retriesLeft-1)
+	}
+
+	// Generate UUID for new URL
+	urlID := utils.GenerateRandomUUID()
+
+	// Create new URL entity (validation happens in domain)
+	url, err := entity.NewURL(urlID, userID, shortCode, req.LongURL, s.validator)
+	if err != nil {
+		return nil, errors.ValidationError(err.Error())
+	}
+
+	savedURL, err := s.repository.Save(ctx, url)
+	if err != nil {
+		return nil, errors.InternalError("save operation failed")
+	}
+
+	return savedURL, nil
+}
+
+func (s *urlService) GetOriginalURL(
+	ctx context.Context,
+	shortCode string,
+) (string, error) {
+	// Try to get from cache first
+	if cachedURL, err := s.cache.GetOriginalURL(ctx, shortCode); err == nil && cachedURL != "" {
+		if err := s.repository.IncrementRedirects(ctx, shortCode); err != nil {
+			s.logger.Warn(ctx, "Failed to update redirect count", 
+				logger.String("shortCode", shortCode),
+				logger.Error(err))
 		}
+		s.logger.Debug(ctx, "Successfully retrieved long URL from cache",
+			logger.String("shortCode", shortCode),
+			logger.String("longURL", cachedURL))
+		return cachedURL, nil
 	}
-	return shortUrl, nil
-}
 
-func (s UrlServiceImpl) GetLongUrl(ctx context.Context, shortUrl string) (string, error) {
-	logger := log.Ctx(ctx).With().Str("shortUrl", shortUrl).Logger()
-
-	longUrl, err := s.urlRepository.GetLongUrl(shortUrl)
+	// Find URL by short code in repository
+	url, err := s.repository.FindByShortCode(ctx, shortCode)
 	if err != nil {
-		logger.Warn().Err(err).Msg("Failed to retrieve long URL")
-		return "", err
+		s.logger.Warn(ctx, "Failed to retrieve URL",
+			logger.String("shortCode", shortCode),
+			logger.Error(err))
+		return "", errors.NotFoundError("URL not found")
 	}
 
-	logger.Debug().Str("longUrl", longUrl).Msg("Successfully retrieved long URL")
-	return longUrl, nil
+	// Cache the result for future requests
+	if cacheErr := s.cache.SetShortURL(ctx, shortCode, url.LongURL(), 0); cacheErr != nil {
+		s.logger.Warn(ctx, "Failed to cache URL",
+			logger.String("shortCode", shortCode),
+			logger.Error(cacheErr))
+	}
+
+	if err := s.repository.IncrementRedirects(ctx, shortCode); err != nil {
+		// Log but don't fail the request if analytics update fails
+		s.logger.Warn(ctx, "Failed to update redirect count",
+			logger.String("shortCode", shortCode),
+			logger.Error(err))
+	}
+
+	s.logger.Debug(ctx, "Successfully retrieved long URL",
+		logger.String("shortCode", shortCode),
+		logger.String("longURL", url.LongURL()))
+	return url.LongURL(), nil
 }
 
-func (s UrlServiceImpl) GetAnalytics(
+func (s *urlService) GetAnalytics(
 	ctx context.Context,
-	shortUrl string,
-	userId string,
+	shortCode string,
+	userID string,
 ) (int, error) {
-	count, err := s.urlRepository.GetAnalytics(shortUrl, userId)
+	url, err := s.repository.FindByShortCode(ctx, shortCode)
 	if err != nil {
-		return -1, err
+		return -1, errors.NotFoundError("URL not found")
 	}
 
-	return count, nil
+	// Check ownership using domain method
+	if !url.IsOwnedBy(userID) {
+		return -1, errors.UnauthorizedError("not authorized to view analytics")
+	}
+
+	return url.Redirects(), nil
 }
 
-func (s UrlServiceImpl) GetPaginatedUrls(
+func (s *urlService) GetPaginatedURLs(
 	ctx context.Context,
-	userId string,
+	userID string,
 	limit int,
 	offset int,
-) ([]valueobject.UrlResponse, error) {
-	urls, err := s.urlRepository.GetPaginatedUrls(userId, limit, offset)
+) ([]valueobject.URLResponse, error) {
+	urls, err := s.repository.FindByUserID(ctx, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, errors.InternalError("query failed")
 	}
 
-	urlResponse := valueobject.CreateGetUrlsResponse(urls)
-
-	return urlResponse, nil
+	return valueobject.CreateGetURLsResponse(urls), nil
 }
 
-func (s UrlServiceImpl) UpdateUrl(ctx context.Context, urlId string, newUrl string) error {
-	err := s.urlRepository.UpdateUrl(urlId, newUrl)
+func (s *urlService) UpdateURL(
+	ctx context.Context,
+	urlID string,
+	userID string,
+	newURL string,
+) error {
+	url, err := s.repository.FindByID(ctx, urlID)
 	if err != nil {
-		return err
+		return errors.NotFoundError("URL not found")
 	}
 
-	return nil
+	// Check ownership using domain method
+	if !url.IsOwnedBy(userID) {
+		return errors.UnauthorizedError("not authorized to update this URL")
+	}
+
+	// Update URL using domain method (includes validation)
+	if err := url.UpdateLongURL(newURL, s.validator); err != nil {
+		return errors.ValidationError(err.Error())
+	}
+
+	// Invalidate cache
+	if cacheErr := s.cache.InvalidateShortURL(ctx, url.ShortCode()); cacheErr != nil {
+		s.logger.Warn(ctx, "Failed to invalidate cache",
+			logger.String("shortCode", url.ShortCode()),
+			logger.Error(cacheErr))
+	}
+
+	// Save changes
+	return s.repository.Update(ctx, url)
 }
 
-func (s UrlServiceImpl) DeleteUrl(ctx context.Context, urlId string, userId string) error {
-	err := s.urlRepository.DeleteUrl(urlId, userId)
+func (s *urlService) DeleteURL(
+	ctx context.Context,
+	urlID string,
+	userID string,
+) error {
+	url, err := s.repository.FindByID(ctx, urlID)
 	if err != nil {
-		return err
+		return errors.NotFoundError("URL not found")
 	}
 
-	return nil
+	// Check ownership using domain method
+	if !url.IsOwnedBy(userID) {
+		return errors.UnauthorizedError("not authorized to delete this URL")
+	}
+
+	// Invalidate cache
+	if cacheErr := s.cache.InvalidateShortURL(ctx, url.ShortCode()); cacheErr != nil {
+		s.logger.Warn(ctx, "Failed to invalidate cache",
+			logger.String("shortCode", url.ShortCode()),
+			logger.Error(cacheErr))
+	}
+
+	return s.repository.Delete(ctx, urlID, userID)
 }

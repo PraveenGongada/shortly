@@ -22,48 +22,59 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	urlService "github.com/PraveenGongada/shortly/internal/domain/url/service"
-	userService "github.com/PraveenGongada/shortly/internal/domain/user/service"
+	"github.com/PraveenGongada/shortly/internal/application/service"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/http/cookie"
 	httpmiddleware "github.com/PraveenGongada/shortly/internal/infrastructure/http/middleware"
 )
 
-type HttpHandlerImpl struct {
-	userService userService.UserService
-	urlService  urlService.UrlService
+type Handler struct {
+	userService   service.UserService
+	urlService    service.URLService
+	cookieManager cookie.Manager
+	logger        logger.Logger
+	authConfig    config.AuthConfig
 }
 
-func NewHttpHandler(
-	userService userService.UserService,
-	urlService urlService.UrlService,
-) *HttpHandlerImpl {
-	return &HttpHandlerImpl{
-		userService: userService,
-		urlService:  urlService,
+func New(
+	userService service.UserService,
+	urlService service.URLService,
+	cookieManager cookie.Manager,
+	logger logger.Logger,
+	authConfig config.AuthConfig,
+) *Handler {
+	return &Handler{
+		userService:   userService,
+		urlService:    urlService,
+		cookieManager: cookieManager,
+		logger:        logger,
+		authConfig:    authConfig,
 	}
 }
 
-func (h *HttpHandlerImpl) Router(r chi.Router) {
+func (h *Handler) Router(r chi.Router) {
 	r.Use(middleware.StripSlashes)
-	r.Use(httpmiddleware.RequestLogger)
+	r.Use(httpmiddleware.RequestLogger(h.logger))
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/health", heartBeatHandler)
+		r.Get("/health", health)
 		r.Route("/user", func(r chi.Router) {
 			r.Post("/login", h.UserLogin)
-			r.Post("/register", h.UserRegsiter)
+			r.Post("/register", h.UserRegister)
 			r.Get("/logout", h.UserLogout)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(httpmiddleware.JwtVerifyToken)
-			r.Get("/urls", h.GetPaginatedUrls)
+			r.Use(httpmiddleware.JwtAuth(h.logger, h.authConfig))
+			r.Get("/urls", h.GetPaginatedURLs)
 			r.Route("/url", func(r chi.Router) {
-				r.Post("/create", h.CreateShortUrl)
-				r.Patch("/update", h.UpdateUrl)
-				r.Delete("/{urlId}", h.DeleteUrl)
+				r.Post("/create", h.CreateShortURL)
+				r.Patch("/update", h.UpdateURL)
+				r.Delete("/{urlId}", h.DeleteURL)
 				r.Get("/analytics/{shortUrl}", h.GetAnalytics)
 			})
 		})
-		r.Get("/{shortUrl}", h.GetLongUrl)
+		r.Get("/{shortUrl}", h.GetLongURL)
 	})
 
 	r.Group(func(r chi.Router) {
@@ -71,7 +82,6 @@ func (h *HttpHandlerImpl) Router(r chi.Router) {
 	})
 }
 
-func heartBeatHandler(w http.ResponseWriter, r *http.Request) {
+func health(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("App is running!"))
-	return
 }
