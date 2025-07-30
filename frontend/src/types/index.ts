@@ -30,8 +30,8 @@ export interface CreateUrlResponse {
 
 export interface UrlResponse {
   id: string;
-  shortUrl: string;
-  longUrl: string;
+  short_code: string;
+  long_url: string;
   redirects: number;
 }
 

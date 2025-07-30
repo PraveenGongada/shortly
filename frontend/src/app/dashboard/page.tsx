@@ -359,21 +359,21 @@ export default function DashboardPage() {
                   >
                     <div className="md:col-span-2 truncate">
                       <a
-                        href={url.longUrl}
+                        href={url.long_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:underline flex items-center gap-1 text-primary"
                       >
-                        {url.longUrl}
+                        {url.long_url}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="truncate">{url.shortUrl}</span>
+                      <span className="truncate">{url.short_code}</span>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => copyToClipboard(url.shortUrl)}
+                        onClick={() => copyToClipboard(url.short_code)}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
                         size="icon"
                         onClick={() => {
                           setEditingUrl(url);
-                          setEditUrl(url.longUrl);
+                          setEditUrl(url.long_url);
                           setIsEditDialogOpen(true);
                         }}
                       >
@@ -446,7 +446,7 @@ export default function DashboardPage() {
             <DialogHeader>
               <DialogTitle>Edit URL</DialogTitle>
               <DialogDescription>
-                Update the destination URL for {editingUrl?.shortUrl}
+                Update the destination URL for {editingUrl?.short_code}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
