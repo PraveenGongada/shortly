@@ -17,81 +17,80 @@
 package config
 
 import (
+	"fmt"
 	"sync"
-	"time"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
+	"github.com/joho/godotenv"
 )
 
 var (
-	cfg    Config
-	doOnce sync.Once
+	globalConfig  *Config
+	globalSecrets SecretProvider
+	configOnce    sync.Once
+	secretsOnce   sync.Once
 )
 
-type Config struct {
-	Application struct {
-		Port                int    `mapstructure:"PORT"`
-		ShortUrlLength      int8   `mapstructure:"SHORT_URL_LENGTH"`
-		MaxCollisionRetries int8   `mapstructure:"MAX_COLLISSION_RETRIES"`
-		Environment         string `mapstructure:"ENVIRONMENT"`
-		Log                 struct {
-			Level string `mapstructure:"LEVEL"`
-		}
-		Key struct {
-			Rsa struct {
-				Public  string `mapstructure:"PUBLIC"`
-				Private string `mapstructure:"PRIVATE"`
-			}
-		}
-		Graceful struct {
-			MaxSecond time.Duration `mapstructure:"MAX_SECOND"`
-		} `mapstructure:"GRACEFUL"`
-	} `mapstructure:"APPLICATION"`
-
-	Auth struct {
-		JwtToken struct {
-			Type           string `mapstructure:"TYPE"`
-			Expired        string `mapstructure:"EXPIRED"`
-			RefreshExpired string `mapstructure:"REFRESH_EXPIRED"`
-		} `mapstructure:"JWT_TOKEN"`
-	} `mapstructure:"AUTH"`
-
-	DB struct {
-		Postgres struct {
-			Host    string `mapstructure:"HOST"`
-			Port    int    `mapstructure:"PORT"`
-			Name    string `mapstructure:"NAME"`
-			User    string `mapstructure:"USER"`
-			Pass    string `mapstructure:"PASS"`
-			SSLMode string `mapstructure:"SSL"`
-			Pool    struct {
-				MaxConns          int32         `mapstructure:"MAX_CONNS"` // (CPU cores × 2) + effective disk spindles
-				MinConns          int32         `mapstructure:"MIN_CONNS"`
-				MaxConnLifetime   time.Duration `mapstructure:"MAX_CONN_LIFETIME"`
-				MaxConnIdleTime   time.Duration `mapstructure:"MAX_CONN_IDLE_TIME"`
-				HealthCheckPeriod time.Duration `mapstructure:"HEALTH_CHECK_PERIOD"`
-			} `mapstructure:"POOL"`
-			QueryTimeout   time.Duration `mapstructure:"QUERY_TIMEOUT"`
-			ConnectTimeout time.Duration `mapstructure:"CONNECT_TIMEOUT"`
-		} `mapstructure:"POSTGRES"`
-	} `mapstructure:"DB"`
+type Manager struct {
+	loader  *Loader
+	secrets SecretProvider
 }
 
-func Get() Config {
-	doOnce.Do(func() {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("internal/infrastructure/config")
-		err := viper.ReadInConfig()
-		if err != nil {
-			log.Fatal().Err(err).Msg("Cannot read config file")
-		}
-		err = viper.Unmarshal(&cfg)
-		if err != nil {
-			log.Fatal().Err(err).Msg("error unmarshaling config")
-		}
-	})
+func NewManager(configPaths []string, envPrefix string) *Manager {
+	return &Manager{
+		loader: NewLoader(configPaths, envPrefix),
+	}
+}
 
-	return cfg
+func (m *Manager) LoadConfig() (*Config, error) {
+	return m.loader.Load()
+}
+
+func (m *Manager) LoadSecrets() (SecretProvider, error) {
+	if m.secrets == nil {
+		var err error
+		m.secrets, err = NewEnvSecretProvider()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create secret provider: %w", err)
+		}
+	}
+	return m.secrets, nil
+}
+
+func LoadGlobalConfig() (*Config, error) {
+	var err error
+	configOnce.Do(func() {
+		// Load .env file if it exists (suppress errors during bootstrap)
+		_ = godotenv.Load()
+
+		manager := NewManager([]string{".", "/etc/shortly/", "configs/"}, "")
+		globalConfig, err = manager.LoadConfig()
+	})
+	return globalConfig, err
+}
+
+func LoadGlobalSecrets() (SecretProvider, error) {
+	var err error
+	secretsOnce.Do(func() {
+		// Load .env file if it exists (suppress errors during bootstrap)
+		_ = godotenv.Load()
+
+		globalSecrets, err = NewEnvSecretProvider()
+	})
+	return globalSecrets, err
+}
+
+func GetGlobalConfig() *Config {
+	config, err := LoadGlobalConfig()
+	if err != nil {
+		panic("Failed to load global configuration: " + err.Error())
+	}
+	return config
+}
+
+func GetGlobalSecrets() SecretProvider {
+	secrets, err := LoadGlobalSecrets()
+	if err != nil {
+		panic("Failed to load global secrets: " + err.Error())
+	}
+	return secrets
 }

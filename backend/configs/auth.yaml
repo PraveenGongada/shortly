@@ -1,0 +1,5 @@
+auth:
+  jwt_token:
+    type: Bearer
+    expired: 24h
+    refresh_expired: 168h
