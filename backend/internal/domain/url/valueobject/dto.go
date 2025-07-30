@@ -18,54 +18,62 @@ package valueobject
 
 import "github.com/PraveenGongada/shortly/internal/domain/url/entity"
 
+// SuccessResponse represents a generic success response
 type SuccessResponse struct {
 	Message string `json:"message"`
 	Success bool   `json:"success"`
 }
 
-type CreateUrlRequest struct {
-	LongUrl string `json:"long_url"`
+// CreateURLRequest represents URL creation request data
+type CreateURLRequest struct {
+	LongURL string `json:"long_url" validate:"required,url"`
 }
 
-type CreateUrlResponse struct {
-	Id       string `json:"id"`
-	ShortUrl string `json:"short_url"`
+// CreateURLResponse represents URL creation response data
+type CreateURLResponse struct {
+	ID        string `json:"id"`
+	ShortCode string `json:"short_code"`
 }
 
-func CreateShortUrlResponse(url *entity.Url) CreateUrlResponse {
-	return CreateUrlResponse{
-		Id:       url.Id,
-		ShortUrl: url.ShortUrl,
+// CreateShortURLResponse creates a CreateURLResponse from a URL entity
+func CreateShortURLResponse(url *entity.URL) CreateURLResponse {
+	return CreateURLResponse{
+		ID:        url.ID(),
+		ShortCode: url.ShortCode(),
 	}
 }
 
-type UrlResponse struct {
-	Id        string `json:"id"`
-	ShortUrl  string `json:"shortUrl"`
-	LongUrl   string `json:"longUrl"`
+// URLResponse represents URL data in responses
+type URLResponse struct {
+	ID        string `json:"id"`
+	ShortCode string `json:"short_code"`
+	LongURL   string `json:"long_url"`
 	Redirects int    `json:"redirects"`
 }
 
-func CreateGetUrlsResponse(urls []entity.Url) []UrlResponse {
-	urlResponse := make([]UrlResponse, len(urls))
+// CreateGetURLsResponse creates a slice of URLResponse from URL entities
+func CreateGetURLsResponse(urls []*entity.URL) []URLResponse {
+	urlResponse := make([]URLResponse, len(urls))
 
 	for i, url := range urls {
-		urlResponse[i] = UrlResponse{
-			Id:        url.Id,
-			ShortUrl:  url.ShortUrl,
-			LongUrl:   url.LongUrl,
-			Redirects: url.Redirects,
+		urlResponse[i] = URLResponse{
+			ID:        url.ID(),
+			ShortCode: url.ShortCode(),
+			LongURL:   url.LongURL(),
+			Redirects: url.Redirects(),
 		}
 	}
 
 	return urlResponse
 }
 
-type UrlUpdateRequest struct {
-	Id  string `json:"id"`
-	Url string `json:"new_url"`
+// URLUpdateRequest represents URL update request data
+type URLUpdateRequest struct {
+	ID     string `json:"id" validate:"required"`
+	NewURL string `json:"new_url" validate:"required,url"`
 }
 
-type DeleteUrlRequest struct {
-	Id string `json:"id"`
+// DeleteURLRequest represents URL deletion request data
+type DeleteURLRequest struct {
+	ID string `json:"id" validate:"required"`
 }

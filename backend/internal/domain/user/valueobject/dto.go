@@ -18,37 +18,43 @@ package valueobject
 
 import "github.com/PraveenGongada/shortly/internal/domain/user/entity"
 
+// Token represents an authentication token
 type Token struct {
 	Type  string `json:"type"`
 	Token string `json:"token"`
 }
 
-type UserLoginReqest struct {
-	Email    string `json:"email" form:"email"`
-	Password string `json:"password" form:"password"`
+// LoginRequest represents user login request data
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
 }
 
-type UserRegisterRequest struct {
-	Email    string `json:"email" form:"email"`
-	Password string `json:"password" form:"password"`
-	Name     string `json:"name" form:"name"`
+// RegisterRequest represents user registration request data
+type RegisterRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
+	Name     string `json:"name" validate:"required,min=1,max=100"`
 }
 
+// UserResponse represents user data in responses
 type UserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
-type UserTokenRespBody struct {
+// TokenResponse represents authentication response
+type TokenResponse struct {
 	Type  string `json:"type"`
 	Token string `json:"token"`
 }
 
-func CreateUserResponse(user entity.User) UserResponse {
+// CreateUserResponse creates a UserResponse from a User entity
+func CreateUserResponse(user *entity.User) UserResponse {
 	return UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
+		ID:    user.ID(),
+		Name:  user.Name(),
+		Email: user.Email(),
 	}
 }

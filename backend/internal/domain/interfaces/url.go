@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package repository
+package interfaces
 
-import (
-	"context"
+// URLValidator defines the interface for URL validation
+type URLValidator interface {
+	ValidateURL(longURL string) error
+	ValidateShortCode(shortCode string) error
+	ValidateUserID(userID string) error
+}
 
-	"github.com/PraveenGongada/shortly/internal/domain/user/entity"
-)
-
-// UserRepository defines persistence operations for users
-type UserRepository interface {
-	FindByEmail(ctx context.Context, email string) (*entity.User, error)
-	FindByID(ctx context.Context, id string) (*entity.User, error)
-	Save(ctx context.Context, user *entity.User) (*entity.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
+// ShortCodeGenerator defines the interface for generating short codes
+type ShortCodeGenerator interface {
+	GenerateShortCode() (string, error)
 }

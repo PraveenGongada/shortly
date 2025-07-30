@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package repository
+package interfaces
 
-import (
-	"context"
+// UserValidator defines the interface for user validation
+type UserValidator interface {
+	ValidateEmail(email string) error
+	ValidatePassword(password string) error
+	ValidateName(name string) error
+}
 
-	"github.com/PraveenGongada/shortly/internal/domain/user/entity"
-)
-
-// UserRepository defines persistence operations for users
-type UserRepository interface {
-	FindByEmail(ctx context.Context, email string) (*entity.User, error)
-	FindByID(ctx context.Context, id string) (*entity.User, error)
-	Save(ctx context.Context, user *entity.User) (*entity.User, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
+// PasswordHasher defines the interface for password hashing operations
+type PasswordHasher interface {
+	HashPassword(password string) (string, error)
+	VerifyPassword(hashedPassword, password string) error
 }

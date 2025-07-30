@@ -17,20 +17,19 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/PraveenGongada/shortly/internal/domain/url/entity"
-	"github.com/PraveenGongada/shortly/internal/domain/url/valueobject"
 )
 
-type UrlRepository interface {
-	CreateShortUrl(
-		id string,
-		userId string,
-		shortUrl string,
-		req *valueobject.CreateUrlRequest,
-	) (*entity.Url, error)
-	GetLongUrl(shortUrl string) (string, error)
-	GetAnalytics(shortUrl string, userId string) (int, error)
-	GetPaginatedUrls(userId string, limit int, offset int) ([]entity.Url, error)
-	UpdateUrl(urlId string, newUrl string) error
-	DeleteUrl(urlId string, userId string) error
+// URLRepository defines persistence operations for URLs
+type URLRepository interface {
+	Save(ctx context.Context, url *entity.URL) (*entity.URL, error)
+	FindByShortCode(ctx context.Context, shortCode string) (*entity.URL, error)
+	FindByID(ctx context.Context, id string) (*entity.URL, error)
+	FindByUserID(ctx context.Context, userID string, limit, offset int) ([]*entity.URL, error)
+	ExistsByShortCode(ctx context.Context, shortCode string) (bool, error)
+	Update(ctx context.Context, url *entity.URL) error
+	Delete(ctx context.Context, id, userID string) error
+	IncrementRedirects(ctx context.Context, shortCode string) error
 }
