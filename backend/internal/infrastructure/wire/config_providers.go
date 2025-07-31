@@ -24,6 +24,7 @@ import (
 	urlCache "github.com/PraveenGongada/shortly/internal/domain/url/cache"
 	urlRepository "github.com/PraveenGongada/shortly/internal/domain/url/repository"
 	urlDomainService "github.com/PraveenGongada/shortly/internal/domain/url/service"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/cache/redis"
 	infraConfig "github.com/PraveenGongada/shortly/internal/infrastructure/config"
 )
 
@@ -53,6 +54,21 @@ func ProvideServerConfig() config.ServerConfig {
 func ProvideLogConfig() config.LogConfig {
 	cfg := infraConfig.GetGlobalConfig()
 	return infraConfig.NewLogConfigAdapter(cfg)
+}
+
+func ProvideRedisConfig() config.RedisConfig {
+	cfg := infraConfig.GetGlobalConfig()
+	secrets := infraConfig.GetGlobalSecrets()
+	return infraConfig.NewRedisConfigAdapter(cfg, secrets)
+}
+
+func ProvideSecurityConfig() config.SecurityConfig {
+	cfg := infraConfig.GetGlobalConfig()
+	return infraConfig.NewSecurityConfigAdapter(cfg)
+}
+
+func NewRedisClient(log logger.Logger, redisConfig config.RedisConfig) redis.Client {
+	return redis.NewClient(log, redisConfig)
 }
 
 func NewGenerator(urlConfig config.URLConfig) interfaces.ShortCodeGenerator {

@@ -48,6 +48,7 @@ func main() {
 	cfg := config.GetGlobalConfig()
 	logConfig := config.NewLogConfigAdapter(cfg)
 	serverConfig := config.NewServerConfigAdapter(cfg)
+	securityConfig := config.NewSecurityConfigAdapter(cfg)
 
 	// Initialize logger with config
 	logger := zerolog.InitLogger(logConfig)
@@ -62,7 +63,7 @@ func main() {
 	}
 
 	// Initialize HTTP layer (these remain manual as they're infrastructure wiring)
-	routerInstance := router.New(handlers)
+	routerInstance := router.New(handlers, securityConfig, domainLogger)
 	server := http.New(routerInstance, domainLogger, serverConfig)
 
 	// Set up graceful shutdown with proper context handling

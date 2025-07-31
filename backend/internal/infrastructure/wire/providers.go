@@ -29,6 +29,7 @@ import (
 	"github.com/PraveenGongada/shortly/internal/infrastructure/cache/redis"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/cookie"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/persistence/postgres"
 )
 
@@ -48,6 +49,7 @@ var ApplicationLayerSet = wire.NewSet(
 
 var InterfaceLayerSet = wire.NewSet(
 	handler.New,
+	router.New,
 )
 
 var InfrastructureLayerSet = wire.NewSet(
@@ -55,10 +57,12 @@ var InfrastructureLayerSet = wire.NewSet(
 	ProvideAuthConfig,
 	ProvideServerConfig,
 	ProvideLogConfig,
+	ProvideRedisConfig,
+	ProvideSecurityConfig,
 	postgres.NewPostgresClient,
 	postgres.NewUserRepository,
 	postgres.NewURLRepository,
-	redis.NewClient,
+	NewRedisClient,
 	redis.NewURLCache,
 	auth.NewJwtTokenGenerator,
 	wire.Bind(new(service.TokenGenerator), new(auth.TokenGenerator)),

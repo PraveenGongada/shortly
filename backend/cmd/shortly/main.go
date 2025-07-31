@@ -55,6 +55,8 @@ func main() {
 	secrets := config.GetGlobalSecrets()
 	logConfig := config.NewLogConfigAdapter(cfg)
 	dbConfig := config.NewDatabaseConfigAdapter(cfg, secrets)
+	redisConfig := config.NewRedisConfigAdapter(cfg, secrets)
+	securityConfig := config.NewSecurityConfigAdapter(cfg)
 	authConfig := config.NewAuthConfigAdapter(cfg, secrets)
 	urlConfig := config.NewURLConfigAdapter(cfg)
 	serverConfig := config.NewServerConfigAdapter(cfg)
@@ -67,7 +69,7 @@ func main() {
 
 	// Initialize infrastructure layer
 	postgresClient := postgres.NewPostgresClient(domainLogger, dbConfig)
-	redisClient := redis.NewClient()
+	redisClient := redis.NewClient(domainLogger, redisConfig)
 	tokenGenerator := auth.NewJwtTokenGenerator(domainLogger, authConfig)
 	cookieManager := cookie.NewCookieManager(authConfig)
 
@@ -97,7 +99,7 @@ func main() {
 
 	// Initialize HTTP layer
 	handlers := handler.New(userService, urlService, cookieManager, domainLogger, authConfig)
-	routerInstance := router.New(handlers)
+	routerInstance := router.New(handlers, securityConfig, domainLogger)
 	server := http.New(routerInstance, domainLogger, serverConfig)
 
 	// Set up graceful shutdown with proper context handling

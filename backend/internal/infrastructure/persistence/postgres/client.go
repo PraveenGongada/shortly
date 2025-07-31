@@ -91,7 +91,7 @@ func NewPostgresClient(log logger.Logger, dbConfig config.DatabaseConfig) Store 
 		panic(err) // Fatal error during initialization
 	}
 
-	log.Info(context.Background(), "Success connecting to DB with pgx")
+	log.Info(context.Background(), "Success connecting to Database with pgx")
 
 	return &store{
 		pool:         pool,
