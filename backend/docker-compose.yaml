@@ -12,7 +12,7 @@ services:
     ports:
       - 5432:5432
     networks:
-      - my_network
+      - shortly_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -21,11 +21,29 @@ services:
     volumes:
       - postgres_data:/var/lib/postgres/data
 
+  redis:
+    image: bitnami/redis:latest
+    container_name: redis
+    restart: always
+    environment:
+      ALLOW_EMPTY_PASSWORD: yes
+    ports:
+      - 6379:6379
+    networks:
+      - shortly_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_data:/data
+
   migrate:
     image: migrate/migrate:latest
     profiles: ["tools"]
     networks:
-      - my_network
+      - shortly_network
     volumes:
       - ./migrations/:/migrations
     entrypoint:
@@ -43,7 +61,8 @@ services:
     restart: on_failure
 
 networks:
-  my_network:
+  shortly_network:
     driver: bridge
 volumes:
   postgres_data:
+  redis_data:

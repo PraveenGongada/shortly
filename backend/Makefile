@@ -45,6 +45,9 @@ migrate-create:
 shell-db:
 	@docker compose -f ${DOCKER_COMPOSE_FILE} exec postgres psql -U postgres -d postgres
 
+shell-redis:
+	@docker compose -f ${DOCKER_COMPOSE_FILE} exec redis redis-cli
+
 start-services:
 	@printf "${YELLOW}Starting docker services...${RESET}\n"
 	@docker compose -f ${DOCKER_COMPOSE_FILE} up -d && \
