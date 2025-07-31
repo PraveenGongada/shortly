@@ -3,7 +3,5 @@ application:
   short_url_length: 7
   environment: DEVELOPMENT
   max_collision_retries: 3
-  log:
-    level: debug
   graceful:
     max_second: 5s
