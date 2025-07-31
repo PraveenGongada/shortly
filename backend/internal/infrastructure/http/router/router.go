@@ -21,30 +21,34 @@ import (
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger"
 
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
+	httpmiddleware "github.com/PraveenGongada/shortly/internal/infrastructure/http/middleware"
 )
 
 type Router struct {
-	handlers *handler.Handler
+	handlers       *handler.Handler
+	securityConfig config.SecurityConfig
+	logger         logger.Logger
 }
 
-func New(handlers *handler.Handler) *Router {
+func New(handlers *handler.Handler, securityConfig config.SecurityConfig, logger logger.Logger) *Router {
 	return &Router{
-		handlers: handlers,
+		handlers:       handlers,
+		securityConfig: securityConfig,
+		logger:         logger,
 	}
 }
 
 func (h *Router) Router(r *chi.Mux) {
+	r.Use(httpmiddleware.RequestTimeout(h.securityConfig, h.logger))
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"shortly.praveengongada.com", "http://localhost:3001"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders: []string{
-			"Accept",
-			"Authorization",
-			"Content-Type",
-			"X-CSRF-Token",
-		},
-		AllowCredentials: true,
+		AllowedOrigins:   h.securityConfig.AllowedOrigins(),
+		AllowedMethods:   h.securityConfig.AllowedMethods(),
+		AllowedHeaders:   h.securityConfig.AllowedHeaders(),
+		AllowCredentials: h.securityConfig.AllowCredentials(),
+		MaxAge:           h.securityConfig.MaxAge(),
 	}))
 
 	h.handlers.Router(r)

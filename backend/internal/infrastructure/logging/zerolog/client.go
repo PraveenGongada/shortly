@@ -64,26 +64,48 @@ func GetDefaultLogLevel(env string) zerolog.Level {
 func InitLogger(logConfig config.LogConfig) zerolog.Logger {
 	env := logConfig.Environment()
 	configuredLogLevel := logConfig.Level()
+	format := logConfig.Format()
+	outputPath := logConfig.Output()
+	caller := logConfig.Caller()
+	timestamp := logConfig.Timestamp()
+	timestampFormat := logConfig.TimestampFormat()
 
-	zerolog.TimeFieldFormat = time.RFC3339
+	if timestampFormat != "" {
+		zerolog.TimeFieldFormat = timestampFormat
+	} else {
+		zerolog.TimeFieldFormat = time.RFC3339
+	}
 
-	zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
-		short := file
-		for i := len(file) - 1; i > 0; i-- {
-			if file[i] == '/' {
-				short = file[i+1:]
-				break
+	if caller {
+		zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
+			short := file
+			for i := len(file) - 1; i > 0; i-- {
+				if file[i] == '/' {
+					short = file[i+1:]
+					break
+				}
 			}
+			return short + ":" + strconv.Itoa(line)
 		}
-		return short + ":" + strconv.Itoa(line)
 	}
 
 	var output io.Writer = os.Stdout
+	if outputPath == "stderr" {
+		output = os.Stderr
+	} else if outputPath != "stdout" && outputPath != "" {
+		file, err := os.OpenFile(outputPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			output = os.Stdout
+		} else {
+			output = file
+		}
+	}
 
-	if env == "DEVELOPMENT" {
+	useConsoleFormat := format == "console"
+	if useConsoleFormat {
 		output = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
+			Out:        output,
+			TimeFormat: timestampFormat,
 		}
 	}
 
@@ -95,14 +117,22 @@ func InitLogger(logConfig config.LogConfig) zerolog.Logger {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	logger := zerolog.New(output).With().
-		Timestamp().
-		Caller().
-		Logger()
+	loggerCtx := zerolog.New(output).With()
+	if timestamp {
+		loggerCtx = loggerCtx.Timestamp()
+	}
+	if caller {
+		loggerCtx = loggerCtx.Caller()
+	}
+	logger := loggerCtx.Logger()
 
 	logger.Info().
 		Str("environment", env).
 		Str("log_level", logLevel.String()).
+		Str("format", format).
+		Str("output", outputPath).
+		Bool("caller", caller).
+		Bool("timestamp", timestamp).
 		Msg("Zerolog initialized...")
 
 	return logger
