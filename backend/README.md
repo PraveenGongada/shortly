@@ -1,218 +1,212 @@
-# Shortly
+# Shortly - URL Shortener Service
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/docs/images/logo.svg" alt="Shortly Logo" width="200" />
-  <p></p>
-
-[![Release](https://img.shields.io/github/v/release/PraveenGongada/shortly?style=flat-square)](https://github.com/PraveenGongada/shortly/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/PraveenGongada/shortly/backend)](https://goreportcard.com/report/github.com/PraveenGongada/shortly)
-[![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-latest-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-1.0.0-2496ED?style=flat-square&logo=docker)](https://www.docker.com/)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go)](https://golang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7+-DC382D?style=flat-square&logo=redis)](https://redis.io/)
 [![License](https://img.shields.io/github/license/PraveenGongada/shortly?style=flat-square)](LICENSE)
 
-  <p></p>
-  <p>Shortly is a fast, scalable URL shortener built with Go. Create short links, track analytics, and manage your URLs via a simple REST API.</p>
-</div>
+A secure, multi-user URL shortener service built with Go following clean architecture principles. Create short links, track click analytics, and manage URLs through a REST API with JWT authentication.
 
 ## ✨ Features
 
-- 🔐 User authentication with JWT
-- 🔗 Create short URLs
-- 📊 Track redirect analytics
-- 🧩 RESTful API design
-- 📱 Clean architecture pattern
-- 🐳 Docker and Docker Compose support
-- 📝 Structured logging
-- 🧪 Database migrations
-- ⚡ High performance
+### Core Functionality
 
-## 🧱 Tech Stack
+- **URL Shortening**: Generate 7-character alphanumeric short codes automatically
+- **User Authentication**: Secure JWT-based authentication with RSA signing
+- **URL Management**: Create, update, delete, and list your short URLs
+- **Click Analytics**: Track redirect counts for each short URL
+- **Multi-User Support**: Each user manages their own URLs independently
 
-- **Backend**: Golang
-- **Database**: PostgreSQL
-- **Authentication**: JWT
-- **API Documentation**: Swagger
-- **Container**: Docker & Docker Compose
-- **Logging**: Zerolog
-- **Migration**: Golang-Migrate
+### Security & Quality
+
+- **Secure Authentication**: JWT tokens with RSA-256 signing
+- **Password Security**: Bcrypt hashing with automatic salting
+- **Input Validation**: Email format, password strength, and URL validation
+- **Clean Architecture**: Domain-driven design with clear separation of concerns
+- **Structured Logging**: Comprehensive logging with zerolog
+
+### Technical Features
+
+- **PostgreSQL Database**: Reliable data persistence with connection pooling
+- **Redis Caching**: Redis is used to cache URL's for faster lookups
+- **Graceful Shutdown**: Proper cleanup on application termination
+- **Health Checks**: Built-in health monitoring endpoint
+- **API Documentation**: Swagger/OpenAPI specification
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Go 1.23+](https://golang.org/dl/)
+- [Docker & Docker Compose](https://docs.docker.com/get-docker/)
+- [Make](https://www.gnu.org/software/make/) (optional, for convenience commands)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/PraveenGongada/shortly.git
+cd shortly/backend
+
+# Start all services (PostgreSQL, Redis, and the app)
+make run
+```
+
+The service will be available at `http://localhost:8080`.
+
+### Manual Setup
+
+```bash
+# Start infrastructure services
+make start-services
+
+# Run database migrations
+make migrate-up
+
+# Start the application
+go run cmd/shortly/main.go
+```
+
+## 📊 API Endpoints
+
+### Public Endpoints
+
+- `GET /{shortCode}` - Redirect to original URL
+- `GET /api/{shortCode}` - Get original URL without redirect
+- `POST /api/user/register` - Register new user
+- `POST /api/user/login` - User login
+- `GET /api/user/logout` - User logout
+- `GET /api/health` - Health check
+
+### Authenticated Endpoints
+
+- `POST /api/url/create` - Create short URL
+- `PATCH /api/url/update` - Update existing URL
+- `DELETE /api/url/{urlId}` - Delete URL
+- `GET /api/url/analytics/{shortCode}` - Get click analytics
+- `GET /api/urls` - List user's URLs (paginated)
+
+Interactive API documentation available at `/swagger/index.html` when running.
 
 ## 🏗️ Architecture
 
-Shortly follows the clean architecture pattern with a clear separation of concerns:
-
-- **Domain Layer**: Core business logic and entities
-- **Application Layer**: Use case implementations
-- **Infrastructure Layer**: External services, repositories, and frameworks
+Shortly follows Clean Architecture principles:
 
 ```
-├── internal/
-│   ├── domain/          # Business entities and interfaces
-│   │   ├── url/         # URL domain
-│   │   └── user/        # User domain
-│   ├── application/     # Application services
-│   │   └── service/     # Application services implementation
-│   └── infrastructure/  # Infrastructure implementations
-│       ├── auth/        # Authentication
-│       ├── config/      # Configuration
-│       ├── http/        # HTTP server
-│       ├── logging/     # Logging
-│       └── persistence/ # Data persistence
-└── cmd/                 # Applications entry points
+internal/
+├── domain/           # Business entities and rules
+│   ├── url/         # URL shortening domain
+│   ├── user/        # User management domain
+│   └── shared/      # Shared domain components
+├── application/     # Use case implementations
+│   └── service/     # Application services
+└── infrastructure/  # External concerns
+    ├── http/        # REST API handlers
+    ├── persistence/ # PostgreSQL repositories
+    ├── cache/       # Redis client
+    ├── auth/        # JWT authentication
+    └── config/      # Configuration management
 ```
 
-## 📋 Prerequisites
+## 🛠️ Development
 
-- Go 1.20+
-- Docker and Docker Compose
-- Make (for running commands)
-
-## 🚀 Getting Started
-
-### Clone the Repository
+### Common Commands
 
 ```bash
-git clone https://github.com/praveengongada/shortly.git
-cd shortly/backend
+# Development with hot reload
+make dev
+
+# Run database migrations
+make migrate-up
+make migrate-down
+
+# Create new migration
+make migrate-create MIGRATION_NAME=add_new_feature
+
+# Database access
+make shell-db
+
+# Build application
+make build
+
+# Generate API documentation
+make swagger
 ```
 
 ### Configuration
 
-1. Copy the example config file:
+The application uses YAML configuration files in the `configs/` directory:
+
+- `application.yaml` - Server and app settings
+- `database.yaml` - PostgreSQL and Redis configuration
+- `auth.yaml` - JWT authentication settings
+
+For development, copy and modify the example configuration:
 
 ```bash
-cp internal/infrastructure/config/config.yaml.example internal/infrastructure/config/config.yaml
+cp config.yaml.example config.yaml
 ```
 
-2. Update the configuration values as needed, particularly the RSA keys for JWT authentication.
-
-### Generate RSA Keys
+### JWT Keys Setup
 
 ```bash
-# Generate private key
-openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
-
-# Extract public key
-openssl rsa -pubout -in private_key.pem -out public_key.pem
-
-# Format for config.yaml
-cat private_key.pem | sed 's/^/        /'
-cat public_key.pem | sed 's/^/        /'
+# Generate RSA keys for JWT signing
+mkdir -p keys
+openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -pubout -in keys/private.pem -out keys/public.pem
 ```
 
-### Run with Docker
+## 🔧 Database Schema
 
-The easiest way to get started is using Docker Compose:
+### Users Table
+
+- User accounts with email/password authentication
+- Bcrypt password hashing
+- UUID primary keys
+
+### URLs Table
+
+- Short URL mappings linked to users
+- 7-character alphanumeric short codes
+- Redirect counter for analytics
+- User ownership enforcement
+
+See [Database Documentation](docs/DATABASE.md) for complete schema details.
+
+## 🚢 Deployment
+
+### Docker Deployment
 
 ```bash
+# Production deployment with Docker Compose
 make run
 ```
 
-This will:
+### Manual Deployment
 
-1. Start the PostgreSQL database
-2. Run migrations
-3. Build and start the application
+1. Set up PostgreSQL and Redis
+2. Configure environment variables
+3. Run migrations: `make migrate-up`
+4. Build and run: `make build && ./bin/main`
 
-### Run for Development
+See [Deployment Guide](docs/DEPLOYMENT.md) for production deployment instructions.
 
-```bash
-make dev
-```
+## 📚 Documentation
 
-This starts the application with hot reload enabled for easier development.
-
-## 📚 API Documentation
-
-Shortly comes with Swagger documentation available at `/swagger/index.html` when the server is running.
-
-### Main Endpoints
-
-| Method | Endpoint                        | Description                  | Auth Required |
-| ------ | ------------------------------- | ---------------------------- | ------------- |
-| POST   | `/api/user/register`            | Register a new user          | No            |
-| POST   | `/api/user/login`               | Login a user                 | No            |
-| GET    | `/api/user/logout`              | Logout a user                | No            |
-| POST   | `/api/url/create`               | Create a short URL           | Yes           |
-| GET    | `/api/urls`                     | Get all user URLs            | Yes           |
-| PATCH  | `/api/url/update`               | Update a URL                 | Yes           |
-| DELETE | `/api/url/{urlId}`              | Delete a URL                 | Yes           |
-| GET    | `/api/url/analytics/{shortUrl}` | Get URL analytics            | Yes           |
-| GET    | `/{shortUrl}`                   | Redirect to the original URL | No            |
-
-## 🛠️ Makefile Commands
-
-Shortly comes with helpful Make commands to streamline development:
-
-```bash
-# Start all services and the application
-make run
-
-# Run in development mode with hot reload
-make dev
-
-# Apply database migrations
-make migrate-up
-
-# Rollback migrations
-make migrate-down
-
-# Create a new migration
-make migrate-create MIGRATION_NAME=your_migration_name
-
-# Access the PostgreSQL shell
-make shell-db
-
-# Start only the services (Docker containers)
-make start-services
-
-# Stop all services
-make stop-services
-
-# Build the application
-make build
-```
-
-## 📊 Database Schema
-
-The application uses two main tables:
-
-**User Table**
-
-```sql
-CREATE TABLE "user" (
-    "id" character(36) NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "email" TEXT NOT NULL UNIQUE,
-    "password" TEXT NOT NULL,
-    "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updated_at" timestamp with time zone
-);
-```
-
-**URL Table**
-
-```sql
-CREATE TABLE url (
-    "id" character(36) NOT NULL PRIMARY KEY,
-    "user_id" character(36) NOT NULL REFERENCES "user"(id),
-    "short_url" varchar(7) NOT NULL UNIQUE,
-    "long_url" TEXT NOT NULL,
-    "redirects" INT NOT NULL DEFAULT 0,
-    "created_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updated_at" timestamp with time zone
-);
-```
-
-## 🌐 Frontend Integration
-
-Shortly's API is designed to work with any frontend. See the CORS settings in `router.go` for allowed origins.
-
-A sample React frontend can be found at [frontend](https://github.com/PraveenGongada/Shortly/blob/main/frontend).
+- **[API Reference](docs/API.md)** - Complete REST API documentation
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and components
+- **[Database Schema](docs/DATABASE.md)** - Data models and relationships
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment
+- **[Development Setup](docs/DEVELOPMENT.md)** - Local development guide
+- **[Configuration](docs/CONFIGURATION.md)** - Settings and environment variables
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check [issues page](https://github.com/praveengongada/shortly/issues).
+1. Fork the repository
+2. Create a feature branch
+3. Follow the [Development Guidelines](docs/DEVELOPMENT.md)
+4. Submit a pull request
 
 ## 📄 License
 
@@ -220,12 +214,13 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 Third-party library attributions can be found in the [NOTICE](NOTICE) file.
 
+## 🆘 Support
+
+- **Issues**: [GitHub Issues](https://github.com/PraveenGongada/shortly/issues)
+- **Documentation**: [Project Documentation](docs/)
+
 ---
 
 <div align="center">
-  <p>Made with ❤️ by <a href="https://github.com/PraveenGongada">Praveen Kumar</a></p>
-  <p>
-    <a href="https://linkedin.com/in/praveengongada">LinkedIn</a> •
-    <a href="https://praveengongada.com">Website</a>
-  </p>
+Built with ❤️ by <a href="https://github.com/PraveenGongada">Praveen Kumar</a>
 </div>
