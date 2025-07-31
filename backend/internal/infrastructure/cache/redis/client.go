@@ -16,7 +16,16 @@
 
 package redis
 
-import "github.com/redis/go-redis/v9"
+import (
+	"context"
+	"fmt"
+	"strconv"
+
+	"github.com/redis/go-redis/v9"
+
+	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
+)
 
 type Client interface {
 	Client() *redis.Client
@@ -30,6 +39,34 @@ func (c *client) Client() *redis.Client {
 	return c.rdb
 }
 
-func NewClient() Client {
-	return &client{}
+func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
+	log.Info(context.Background(), "Initializing Redis connection...")
+
+	addr := fmt.Sprintf("%s:%s", redisConfig.Host(), strconv.Itoa(redisConfig.Port()))
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:            addr,
+		Password:        redisConfig.Password(),
+		DB:              redisConfig.Database(),
+		DialTimeout:     redisConfig.DialTimeout(),
+		ReadTimeout:     redisConfig.ReadTimeout(),
+		WriteTimeout:    redisConfig.WriteTimeout(),
+		PoolSize:        redisConfig.MaxActive(),
+		MinIdleConns:    redisConfig.MaxIdle(),
+		ConnMaxIdleTime: redisConfig.IdleTimeout(),
+		ConnMaxLifetime: redisConfig.MaxConnLifetime(),
+	})
+
+	// Test the connection
+	ctx, cancel := context.WithTimeout(context.Background(), redisConfig.DialTimeout())
+	defer cancel()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Error(context.Background(), "Error connecting to Redis", logger.Error(err))
+		panic(err) // Fatal error during initialization
+	}
+
+	log.Info(context.Background(), "Success connecting to Redis")
+
+	return &client{rdb: rdb}
 }

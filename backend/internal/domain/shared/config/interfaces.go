@@ -63,4 +63,34 @@ type ServerConfig interface {
 type LogConfig interface {
 	Environment() string
 	Level() string
+	Format() string
+	Output() string
+	Caller() bool
+	Timestamp() bool
+	TimestampFormat() string
+}
+
+// RedisConfig defines configuration needed for Redis cache
+type RedisConfig interface {
+	Host() string
+	Port() int
+	Database() int
+	Password() string
+	DialTimeout() time.Duration
+	ReadTimeout() time.Duration
+	WriteTimeout() time.Duration
+	MaxIdle() int
+	MaxActive() int
+	IdleTimeout() time.Duration
+	MaxConnLifetime() time.Duration
+}
+
+// SecurityConfig defines configuration needed for security features
+type SecurityConfig interface {
+	AllowedOrigins() []string
+	AllowedMethods() []string
+	AllowedHeaders() []string
+	AllowCredentials() bool
+	MaxAge() int
+	RequestTimeout() time.Duration
 }

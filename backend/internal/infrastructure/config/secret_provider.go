@@ -27,6 +27,7 @@ import (
 type SecretProvider interface {
 	GetDatabaseUser() string
 	GetDatabasePassword() string
+	GetRedisPassword() string
 	GetRSAPublicKey() *rsa.PublicKey
 	GetRSAPrivateKey() *rsa.PrivateKey
 }
@@ -67,6 +68,10 @@ func (e *EnvSecretProvider) GetDatabasePassword() string {
 
 func (e *EnvSecretProvider) GetRSAPublicKey() *rsa.PublicKey {
 	return e.rsaPublicKey
+}
+
+func (e *EnvSecretProvider) GetRedisPassword() string {
+	return os.Getenv("REDIS_PASSWORD")
 }
 
 func (e *EnvSecretProvider) GetRSAPrivateKey() *rsa.PrivateKey {

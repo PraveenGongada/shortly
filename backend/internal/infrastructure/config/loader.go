@@ -26,7 +26,12 @@ import (
 )
 
 type LogConfig struct {
-	Level string `yaml:"level" mapstructure:"LEVEL" validate:"required,oneof=trace debug info warn error fatal panic"`
+	Level           string `yaml:"level" mapstructure:"LEVEL" validate:"required,oneof=trace debug info warn error fatal panic"`
+	Format          string `yaml:"format" mapstructure:"FORMAT" validate:"required,oneof=json console"`
+	Output          string `yaml:"output" mapstructure:"OUTPUT" validate:"required"`
+	Caller          bool   `yaml:"caller" mapstructure:"CALLER"`
+	Timestamp       bool   `yaml:"timestamp" mapstructure:"TIMESTAMP"`
+	TimestampFormat string `yaml:"timestamp_format" mapstructure:"TIMESTAMP_FORMAT"`
 }
 
 type GracefulConfig struct {
@@ -38,7 +43,6 @@ type ApplicationConfig struct {
 	ShortUrlLength      int8           `yaml:"short_url_length" mapstructure:"SHORT_URL_LENGTH" validate:"required,min=4,max=20"`
 	MaxCollisionRetries int8           `yaml:"max_collision_retries" mapstructure:"MAX_COLLISION_RETRIES" validate:"required,min=1,max=10"`
 	Environment         string         `yaml:"environment" mapstructure:"ENVIRONMENT" validate:"required,oneof=DEVELOPMENT STAGING PRODUCTION"`
-	Log                 LogConfig      `yaml:"log" mapstructure:"LOG"`
 	Graceful            GracefulConfig `yaml:"graceful" mapstructure:"GRACEFUL"`
 }
 
@@ -70,10 +74,22 @@ type PostgresConfig struct {
 	ConnectTimeout time.Duration      `yaml:"connect_timeout" mapstructure:"CONNECT_TIMEOUT" validate:"required"`
 }
 
+type RedisPoolConfig struct {
+	MaxIdle         int           `yaml:"max_idle" mapstructure:"MAX_IDLE" validate:"required,min=1"`
+	MaxActive       int           `yaml:"max_active" mapstructure:"MAX_ACTIVE" validate:"required,min=1"`
+	IdleTimeout     time.Duration `yaml:"idle_timeout" mapstructure:"IDLE_TIMEOUT" validate:"required"`
+	MaxConnLifetime time.Duration `yaml:"max_conn_lifetime" mapstructure:"MAX_CONN_LIFETIME" validate:"required"`
+}
+
 type RedisConfig struct {
-	Host     string `yaml:"host" mapstructure:"HOST" validate:"required"`
-	Port     int    `yaml:"port" mapstructure:"PORT" validate:"required,min=1,max=65535"`
-	Database int    `yaml:"database" mapstructure:"DATABASE" validate:"min=0,max=15"`
+	Host         string          `yaml:"host" mapstructure:"HOST" validate:"required"`
+	Port         int             `yaml:"port" mapstructure:"PORT" validate:"required,min=1,max=65535"`
+	Database     int             `yaml:"database" mapstructure:"DATABASE" validate:"min=0,max=15"`
+	Password     string          `yaml:"password" mapstructure:"PASSWORD"`
+	DialTimeout  time.Duration   `yaml:"dial_timeout" mapstructure:"DIAL_TIMEOUT" validate:"required"`
+	ReadTimeout  time.Duration   `yaml:"read_timeout" mapstructure:"READ_TIMEOUT" validate:"required"`
+	WriteTimeout time.Duration   `yaml:"write_timeout" mapstructure:"WRITE_TIMEOUT" validate:"required"`
+	Pool         RedisPoolConfig `yaml:"pool" mapstructure:"POOL"`
 }
 
 type DatabaseConfig struct {
@@ -81,10 +97,26 @@ type DatabaseConfig struct {
 	Redis    RedisConfig    `yaml:"redis" mapstructure:"REDIS"`
 }
 
+type CORSConfig struct {
+	AllowedOrigins   []string `yaml:"allowed_origins" mapstructure:"ALLOWED_ORIGINS" validate:"required"`
+	AllowedMethods   []string `yaml:"allowed_methods" mapstructure:"ALLOWED_METHODS" validate:"required"`
+	AllowedHeaders   []string `yaml:"allowed_headers" mapstructure:"ALLOWED_HEADERS" validate:"required"`
+	AllowCredentials bool     `yaml:"allow_credentials" mapstructure:"ALLOW_CREDENTIALS"`
+	MaxAge           int      `yaml:"max_age" mapstructure:"MAX_AGE" validate:"min=0"`
+}
+
+
+type SecurityConfig struct {
+	CORS           CORSConfig    `yaml:"cors" mapstructure:"CORS"`
+	RequestTimeout time.Duration `yaml:"request_timeout" mapstructure:"REQUEST_TIMEOUT" validate:"required"`
+}
+
 type Config struct {
 	Application ApplicationConfig `yaml:"application" mapstructure:"APPLICATION"`
 	Auth        AuthConfig        `yaml:"auth" mapstructure:"AUTH"`
-	DB          DatabaseConfig    `yaml:"db" mapstructure:"DB"`
+	Database    DatabaseConfig    `yaml:"database" mapstructure:"DATABASE"`
+	Logging     LogConfig         `yaml:"logging" mapstructure:"LOGGING"`
+	Security    SecurityConfig    `yaml:"security" mapstructure:"SECURITY"`
 }
 
 type Loader struct {
@@ -133,17 +165,17 @@ func (l *Loader) Load() (*Config, error) {
 }
 
 func (l *Loader) loadModularConfigs(v *viper.Viper) error {
-	configFiles := []string{"application", "auth", "database"}
-	
+	configFiles := []string{"application", "auth", "database", "logging", "security"}
+
 	for _, configFile := range configFiles {
 		configViper := viper.New()
 		configViper.SetConfigName(configFile)
 		configViper.SetConfigType("yaml")
-		
+
 		for _, path := range l.configPaths {
 			configViper.AddConfigPath(path)
 		}
-		
+
 		if err := configViper.ReadInConfig(); err != nil {
 			// Continue if file doesn't exist
 			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -151,20 +183,20 @@ func (l *Loader) loadModularConfigs(v *viper.Viper) error {
 			}
 			return fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
-		
+
 		// Merge settings from this config file
 		if err := v.MergeConfigMap(configViper.AllSettings()); err != nil {
 			return fmt.Errorf("failed to merge config from %s: %w", configFile, err)
 		}
 	}
-	
+
 	return nil
 }
 
 func (l *Loader) configureViper(v *viper.Viper) {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
-	
+
 	for _, path := range l.configPaths {
 		v.AddConfigPath(path)
 	}
@@ -187,8 +219,15 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("APPLICATION.SHORT_URL_LENGTH", 7)
 	v.SetDefault("APPLICATION.MAX_COLLISION_RETRIES", 3)
 	v.SetDefault("APPLICATION.ENVIRONMENT", "DEVELOPMENT")
-	v.SetDefault("APPLICATION.LOG.LEVEL", "info")
 	v.SetDefault("APPLICATION.GRACEFUL.MAX_SECOND", "30s")
+
+	// Logging defaults
+	v.SetDefault("LOGGING.LEVEL", "info")
+	v.SetDefault("LOGGING.FORMAT", "json")
+	v.SetDefault("LOGGING.OUTPUT", "stdout")
+	v.SetDefault("LOGGING.CALLER", true)
+	v.SetDefault("LOGGING.TIMESTAMP", true)
+	v.SetDefault("LOGGING.TIMESTAMP_FORMAT", "2006-01-02T15:04:05Z07:00")
 
 	// Auth defaults
 	v.SetDefault("AUTH.JWT_TOKEN.TYPE", "Bearer")
@@ -196,22 +235,38 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	v.SetDefault("AUTH.JWT_TOKEN.REFRESH_EXPIRED", "168h")
 
 	// Database defaults
-	v.SetDefault("DB.POSTGRES.HOST", "localhost")
-	v.SetDefault("DB.POSTGRES.PORT", 5432)
-	v.SetDefault("DB.POSTGRES.NAME", "shortly")
-	v.SetDefault("DB.POSTGRES.SSL", "disable")
-	v.SetDefault("DB.POSTGRES.QUERY_TIMEOUT", "5s")
-	v.SetDefault("DB.POSTGRES.CONNECT_TIMEOUT", "10s")
+	v.SetDefault("Database.POSTGRES.HOST", "localhost")
+	v.SetDefault("Database.POSTGRES.PORT", 5432)
+	v.SetDefault("Database.POSTGRES.NAME", "shortly")
+	v.SetDefault("Database.POSTGRES.SSL", "disable")
+	v.SetDefault("Database.POSTGRES.QUERY_TIMEOUT", "5s")
+	v.SetDefault("Database.POSTGRES.CONNECT_TIMEOUT", "10s")
 
 	// Pool defaults
-	v.SetDefault("DB.POSTGRES.POOL.MAX_CONNS", 25)
-	v.SetDefault("DB.POSTGRES.POOL.MIN_CONNS", 5)
-	v.SetDefault("DB.POSTGRES.POOL.MAX_CONN_LIFETIME", "1h")
-	v.SetDefault("DB.POSTGRES.POOL.MAX_CONN_IDLE_TIME", "15m")
-	v.SetDefault("DB.POSTGRES.POOL.HEALTH_CHECK_PERIOD", "2m")
+	v.SetDefault("Database.POSTGRES.POOL.MAX_CONNS", 25)
+	v.SetDefault("Database.POSTGRES.POOL.MIN_CONNS", 5)
+	v.SetDefault("Database.POSTGRES.POOL.MAX_CONN_LIFETIME", "1h")
+	v.SetDefault("Database.POSTGRES.POOL.MAX_CONN_IDLE_TIME", "15m")
+	v.SetDefault("Database.POSTGRES.POOL.HEALTH_CHECK_PERIOD", "2m")
 
 	// Redis defaults
-	v.SetDefault("DB.REDIS.HOST", "localhost")
-	v.SetDefault("DB.REDIS.PORT", 6379)
-	v.SetDefault("DB.REDIS.DATABASE", 0)
+	v.SetDefault("Database.REDIS.HOST", "localhost")
+	v.SetDefault("Database.REDIS.PORT", 6379)
+	v.SetDefault("Database.REDIS.DATABASE", 0)
+	v.SetDefault("Database.REDIS.PASSWORD", "")
+	v.SetDefault("Database.REDIS.DIAL_TIMEOUT", "5s")
+	v.SetDefault("Database.REDIS.READ_TIMEOUT", "3s")
+	v.SetDefault("Database.REDIS.WRITE_TIMEOUT", "3s")
+	v.SetDefault("Database.REDIS.POOL.MAX_IDLE", 10)
+	v.SetDefault("Database.REDIS.POOL.MAX_ACTIVE", 100)
+	v.SetDefault("Database.REDIS.POOL.IDLE_TIMEOUT", "240s")
+	v.SetDefault("Database.REDIS.POOL.MAX_CONN_LIFETIME", "1h")
+
+	// Security defaults
+	v.SetDefault("SECURITY.CORS.ALLOWED_ORIGINS", []string{"http://localhost:3000"})
+	v.SetDefault("SECURITY.CORS.ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
+	v.SetDefault("SECURITY.CORS.ALLOWED_HEADERS", []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"})
+	v.SetDefault("SECURITY.CORS.ALLOW_CREDENTIALS", true)
+	v.SetDefault("SECURITY.CORS.MAX_AGE", 300)
+	v.SetDefault("SECURITY.REQUEST_TIMEOUT", "30s")
 }

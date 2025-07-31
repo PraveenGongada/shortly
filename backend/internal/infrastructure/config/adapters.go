@@ -32,28 +32,84 @@ func NewDatabaseConfigAdapter(cfg *Config, secrets SecretProvider) domainConfig.
 	return &DatabaseConfigAdapter{config: cfg, secrets: secrets}
 }
 
-func (d *DatabaseConfigAdapter) Host() string          { return d.config.DB.Postgres.Host }
-func (d *DatabaseConfigAdapter) Port() int             { return d.config.DB.Postgres.Port }
-func (d *DatabaseConfigAdapter) Name() string          { return d.config.DB.Postgres.Name }
-func (d *DatabaseConfigAdapter) User() string          { return d.secrets.GetDatabaseUser() }
-func (d *DatabaseConfigAdapter) Password() string      { return d.secrets.GetDatabasePassword() }
-func (d *DatabaseConfigAdapter) SSLMode() string       { return d.config.DB.Postgres.SSLMode }
-func (d *DatabaseConfigAdapter) MaxConnections() int32 { return d.config.DB.Postgres.Pool.MaxConns }
-func (d *DatabaseConfigAdapter) MinConnections() int32 { return d.config.DB.Postgres.Pool.MinConns }
+type RedisConfigAdapter struct {
+	config  *Config
+	secrets SecretProvider
+}
+
+func NewRedisConfigAdapter(cfg *Config, secrets SecretProvider) domainConfig.RedisConfig {
+	return &RedisConfigAdapter{config: cfg, secrets: secrets}
+}
+
+func (r *RedisConfigAdapter) Host() string               { return r.config.Database.Redis.Host }
+func (r *RedisConfigAdapter) Port() int                  { return r.config.Database.Redis.Port }
+func (r *RedisConfigAdapter) Database() int              { return r.config.Database.Redis.Database }
+func (r *RedisConfigAdapter) Password() string           { return r.secrets.GetRedisPassword() }
+func (r *RedisConfigAdapter) DialTimeout() time.Duration { return r.config.Database.Redis.DialTimeout }
+func (r *RedisConfigAdapter) ReadTimeout() time.Duration { return r.config.Database.Redis.ReadTimeout }
+func (r *RedisConfigAdapter) WriteTimeout() time.Duration {
+	return r.config.Database.Redis.WriteTimeout
+}
+func (r *RedisConfigAdapter) MaxIdle() int   { return r.config.Database.Redis.Pool.MaxIdle }
+func (r *RedisConfigAdapter) MaxActive() int { return r.config.Database.Redis.Pool.MaxActive }
+func (r *RedisConfigAdapter) IdleTimeout() time.Duration {
+	return r.config.Database.Redis.Pool.IdleTimeout
+}
+func (r *RedisConfigAdapter) MaxConnLifetime() time.Duration {
+	return r.config.Database.Redis.Pool.MaxConnLifetime
+}
+
+type SecurityConfigAdapter struct {
+	config *Config
+}
+
+func NewSecurityConfigAdapter(cfg *Config) domainConfig.SecurityConfig {
+	return &SecurityConfigAdapter{config: cfg}
+}
+
+func (s *SecurityConfigAdapter) AllowedOrigins() []string {
+	return s.config.Security.CORS.AllowedOrigins
+}
+func (s *SecurityConfigAdapter) AllowedMethods() []string {
+	return s.config.Security.CORS.AllowedMethods
+}
+func (s *SecurityConfigAdapter) AllowedHeaders() []string {
+	return s.config.Security.CORS.AllowedHeaders
+}
+func (s *SecurityConfigAdapter) AllowCredentials() bool {
+	return s.config.Security.CORS.AllowCredentials
+}
+func (s *SecurityConfigAdapter) MaxAge() int { return s.config.Security.CORS.MaxAge }
+func (s *SecurityConfigAdapter) RequestTimeout() time.Duration {
+	return s.config.Security.RequestTimeout
+}
+
+func (d *DatabaseConfigAdapter) Host() string     { return d.config.Database.Postgres.Host }
+func (d *DatabaseConfigAdapter) Port() int        { return d.config.Database.Postgres.Port }
+func (d *DatabaseConfigAdapter) Name() string     { return d.config.Database.Postgres.Name }
+func (d *DatabaseConfigAdapter) User() string     { return d.secrets.GetDatabaseUser() }
+func (d *DatabaseConfigAdapter) Password() string { return d.secrets.GetDatabasePassword() }
+func (d *DatabaseConfigAdapter) SSLMode() string  { return d.config.Database.Postgres.SSLMode }
+func (d *DatabaseConfigAdapter) MaxConnections() int32 {
+	return d.config.Database.Postgres.Pool.MaxConns
+}
+func (d *DatabaseConfigAdapter) MinConnections() int32 {
+	return d.config.Database.Postgres.Pool.MinConns
+}
 func (d *DatabaseConfigAdapter) MaxConnLifetime() time.Duration {
-	return d.config.DB.Postgres.Pool.MaxConnLifetime
+	return d.config.Database.Postgres.Pool.MaxConnLifetime
 }
 func (d *DatabaseConfigAdapter) MaxConnIdleTime() time.Duration {
-	return d.config.DB.Postgres.Pool.MaxConnIdleTime
+	return d.config.Database.Postgres.Pool.MaxConnIdleTime
 }
 func (d *DatabaseConfigAdapter) HealthCheckPeriod() time.Duration {
-	return d.config.DB.Postgres.Pool.HealthCheckPeriod
+	return d.config.Database.Postgres.Pool.HealthCheckPeriod
 }
 func (d *DatabaseConfigAdapter) QueryTimeout() time.Duration {
-	return d.config.DB.Postgres.QueryTimeout
+	return d.config.Database.Postgres.QueryTimeout
 }
 func (d *DatabaseConfigAdapter) ConnectTimeout() time.Duration {
-	return d.config.DB.Postgres.ConnectTimeout
+	return d.config.Database.Postgres.ConnectTimeout
 }
 
 type AuthConfigAdapter struct {
@@ -105,5 +161,10 @@ func NewLogConfigAdapter(cfg *Config) domainConfig.LogConfig {
 	return &LogConfigAdapter{config: cfg}
 }
 
-func (l *LogConfigAdapter) Environment() string { return l.config.Application.Environment }
-func (l *LogConfigAdapter) Level() string       { return l.config.Application.Log.Level }
+func (l *LogConfigAdapter) Environment() string     { return l.config.Application.Environment }
+func (l *LogConfigAdapter) Level() string           { return l.config.Logging.Level }
+func (l *LogConfigAdapter) Format() string          { return l.config.Logging.Format }
+func (l *LogConfigAdapter) Output() string          { return l.config.Logging.Output }
+func (l *LogConfigAdapter) Caller() bool            { return l.config.Logging.Caller }
+func (l *LogConfigAdapter) Timestamp() bool         { return l.config.Logging.Timestamp }
+func (l *LogConfigAdapter) TimestampFormat() string { return l.config.Logging.TimestampFormat }
