@@ -32,8 +32,8 @@ import (
 // @Tags user
 // @Accept json
 // @Produce json
-// @Param request body valueobject.UserLoginReqest true "User login credentials"
-// @Success 200 {object} response.Response{data=valueobject.UserTokenRespBody} "Login successful"
+// @Param request body valueobject.LoginRequest true "User login credentials"
+// @Success 200 {object} response.Response{data=valueobject.TokenResponse} "Login successful"
 // @Failure 400 {object} response.Response "Invalid request"
 // @Failure 401 {object} response.Response "Invalid credentials"
 // @Failure 500 {object} response.Response "Internal server error"
@@ -83,8 +83,8 @@ func (h *Handler) UserLogout(w http.ResponseWriter, r *http.Request) {
 // @Tags user
 // @Accept json
 // @Produce json
-// @Param request body valueobject.UserRegisterRequest true "User registration data"
-// @Success 200 {object} response.Response{data=valueobject.UserTokenRespBody} "Registration successful"
+// @Param request body valueobject.RegisterRequest true "User registration data"
+// @Success 200 {object} response.Response{data=valueobject.TokenResponse} "Registration successful"
 // @Failure 400 {object} response.Response "Invalid request"
 // @Failure 401 {object} response.Response "Email already registered"
 // @Failure 500 {object} response.Response "Internal server error"

@@ -19,7 +19,7 @@ package main
 import (
 	"context"
 
-	_ "github.com/PraveenGongada/shortly/docs"
+	_ "github.com/PraveenGongada/shortly/api"
 	"github.com/PraveenGongada/shortly/internal/application/service"
 	urlDomainService "github.com/PraveenGongada/shortly/internal/domain/url/service"
 	userDomainService "github.com/PraveenGongada/shortly/internal/domain/user/service"

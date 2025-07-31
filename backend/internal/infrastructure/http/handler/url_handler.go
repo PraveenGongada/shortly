@@ -36,8 +36,8 @@ import (
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer JWT token"
-// @Param request body valueobject.CreateUrlRequest true "URL information"
-// @Success 201 {object} response.Response{data=valueobject.CreateUrlResponse} "URL created successfully"
+// @Param request body valueobject.CreateURLRequest true "URL information"
+// @Success 201 {object} response.Response{data=valueobject.CreateURLResponse} "URL created successfully"
 // @Failure 400 {object} response.Response "Invalid request"
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
@@ -161,7 +161,7 @@ func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 // @Param Authorization header string true "Bearer JWT token"
 // @Param limit query int true "Limit"
 // @Param offset query int true "Offset"
-// @Success 200 {object} response.Response{data=[]valueobject.UrlResponse} "URLs list"
+// @Success 200 {object} response.Response{data=[]valueobject.URLResponse} "URLs list"
 // @Failure 400 {object} response.Response "Bad request"
 // @Failure 401 {object} response.Response "Unauthorized"
 // @Failure 500 {object} response.Response "Internal server error"
@@ -203,7 +203,7 @@ func (h *Handler) GetPaginatedURLs(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer JWT token"
-// @Param request body valueobject.UrlUpdateRequest true "URL update information"
+// @Param request body valueobject.URLUpdateRequest true "URL update information"
 // @Success 200 {object} response.Response "URL updated successfully"
 // @Failure 400 {object} response.Response "Bad request"
 // @Failure 401 {object} response.Response "Unauthorized"

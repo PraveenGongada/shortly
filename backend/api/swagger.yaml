@@ -6,58 +6,74 @@ definitions:
       message:
         type: string
     type: object
-  valueobject.CreateUrlRequest:
+  valueobject.CreateURLRequest:
     properties:
       long_url:
         type: string
+    required:
+    - long_url
     type: object
-  valueobject.CreateUrlResponse:
+  valueobject.CreateURLResponse:
     properties:
       id:
         type: string
-      short_url:
+      short_code:
         type: string
     type: object
-  valueobject.UrlResponse:
-    properties:
-      id:
-        type: string
-      longUrl:
-        type: string
-      redirects:
-        type: integer
-      shortUrl:
-        type: string
-    type: object
-  valueobject.UrlUpdateRequest:
-    properties:
-      id:
-        type: string
-      new_url:
-        type: string
-    type: object
-  valueobject.UserLoginReqest:
+  valueobject.LoginRequest:
     properties:
       email:
         type: string
       password:
+        minLength: 8
         type: string
+    required:
+    - email
+    - password
     type: object
-  valueobject.UserRegisterRequest:
+  valueobject.RegisterRequest:
     properties:
       email:
         type: string
       name:
+        maxLength: 100
+        minLength: 1
         type: string
       password:
+        minLength: 8
         type: string
+    required:
+    - email
+    - name
+    - password
     type: object
-  valueobject.UserTokenRespBody:
+  valueobject.TokenResponse:
     properties:
       token:
         type: string
       type:
         type: string
+    type: object
+  valueobject.URLResponse:
+    properties:
+      id:
+        type: string
+      long_url:
+        type: string
+      redirects:
+        type: integer
+      short_code:
+        type: string
+    type: object
+  valueobject.URLUpdateRequest:
+    properties:
+      id:
+        type: string
+      new_url:
+        type: string
+    required:
+    - id
+    - new_url
     type: object
 host: localhost:8080
 info:
@@ -194,7 +210,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/valueobject.CreateUrlRequest'
+          $ref: '#/definitions/valueobject.CreateURLRequest'
       produces:
       - application/json
       responses:
@@ -205,7 +221,7 @@ paths:
             - $ref: '#/definitions/response.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/valueobject.CreateUrlResponse'
+                  $ref: '#/definitions/valueobject.CreateURLResponse'
               type: object
         "400":
           description: Invalid request
@@ -238,7 +254,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/valueobject.UrlUpdateRequest'
+          $ref: '#/definitions/valueobject.URLUpdateRequest'
       produces:
       - application/json
       responses:
@@ -291,7 +307,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/valueobject.UrlResponse'
+                    $ref: '#/definitions/valueobject.URLResponse'
                   type: array
               type: object
         "400":
@@ -320,7 +336,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/valueobject.UserLoginReqest'
+          $ref: '#/definitions/valueobject.LoginRequest'
       produces:
       - application/json
       responses:
@@ -331,7 +347,7 @@ paths:
             - $ref: '#/definitions/response.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/valueobject.UserTokenRespBody'
+                  $ref: '#/definitions/valueobject.TokenResponse'
               type: object
         "400":
           description: Invalid request
@@ -372,7 +388,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/valueobject.UserRegisterRequest'
+          $ref: '#/definitions/valueobject.RegisterRequest'
       produces:
       - application/json
       responses:
@@ -383,7 +399,7 @@ paths:
             - $ref: '#/definitions/response.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/valueobject.UserTokenRespBody'
+                  $ref: '#/definitions/valueobject.TokenResponse'
               type: object
         "400":
           description: Invalid request

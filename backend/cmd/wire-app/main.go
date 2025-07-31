@@ -20,7 +20,7 @@ import (
 	"context"
 	"log"
 
-	_ "github.com/PraveenGongada/shortly/docs"
+	_ "github.com/PraveenGongada/shortly/api"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"

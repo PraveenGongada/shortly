@@ -77,6 +77,6 @@ dev-restart:
 swagger:
 	@printf "${YELLOW}Generating swagger documentation...${RESET}\n"
 	@which swag >/dev/null || go install github.com/swaggo/swag/cmd/swag@latest
-	@swag init -g cmd/shortly/main.go -o ./docs && \
+	@swag init -g cmd/shortly/main.go -o ./api && \
 		printf "${GREEN}Swagger documentation generated.${RESET}\n" || \
 		printf "${RED}Failed to generate swagger documentation.${RESET}\n"
