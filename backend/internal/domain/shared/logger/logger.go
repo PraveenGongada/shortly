@@ -29,19 +29,19 @@ type Logger interface {
 // Field represents a structured logging field
 type Field interface {
 	Key() string
-	Value() interface{}
+	Value() any
 }
 
 type field struct {
 	key   string
-	value interface{}
+	value any
 }
 
 func (f field) Key() string {
 	return f.key
 }
 
-func (f field) Value() interface{} {
+func (f field) Value() any {
 	return f.value
 }
 
@@ -69,6 +69,6 @@ func Error(err error) Field {
 	return field{key: "error", value: err}
 }
 
-func Any(key string, value interface{}) Field {
+func Any(key string, value any) Field {
 	return field{key: key, value: value}
 }

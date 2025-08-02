@@ -24,11 +24,11 @@ import (
 )
 
 type Response struct {
-	Message *string     `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Data    any     `json:"data,omitempty"`
 }
 
-func Json(w http.ResponseWriter, httpCode int, message string, data interface{}) {
+func Json(w http.ResponseWriter, httpCode int, message string, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpCode)
 	res := Response{

@@ -25,9 +25,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/response"
-	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 )
 
 func JwtAuth(log logger.Logger, authConfig config.AuthConfig) func(http.Handler) http.Handler {
@@ -59,7 +59,7 @@ func JwtAuth(log logger.Logger, authConfig config.AuthConfig) func(http.Handler)
 					logger.String("middleware", "JwtVerifyToken"))
 			}
 
-			token, err := jwt.Parse(JwtToken, func(token *jwt.Token) (interface{}, error) {
+			token, err := jwt.Parse(JwtToken, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 					log.Warn(r.Context(), "Unexpected signing method",
 						logger.String("middleware", "JwtVerifyToken"),

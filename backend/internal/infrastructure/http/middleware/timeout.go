@@ -35,7 +35,7 @@ func RequestTimeout(securityConfig config.SecurityConfig, log logger.Logger) fun
 			r = r.WithContext(ctx)
 
 			done := make(chan struct{})
-			panicChan := make(chan interface{}, 1)
+			panicChan := make(chan any, 1)
 
 			go func() {
 				defer func() {

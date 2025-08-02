@@ -56,7 +56,7 @@ func (z *adapter) getLoggerWithContext(ctx context.Context) zerolog.Logger {
 	return *ctxLogger
 }
 
-func (z *adapter) addFieldToEvent(event *zerolog.Event, key string, value interface{}) *zerolog.Event {
+func (z *adapter) addFieldToEvent(event *zerolog.Event, key string, value any) *zerolog.Event {
 	// Handle special error case first since it has different API (no key parameter)
 	if err, ok := value.(error); ok {
 		return event.Err(err)
@@ -85,7 +85,7 @@ func (z *adapter) addFieldToEvent(event *zerolog.Event, key string, value interf
 	}
 }
 
-func (z *adapter) addFieldToContext(ctx zerolog.Context, key string, value interface{}) zerolog.Context {
+func (z *adapter) addFieldToContext(ctx zerolog.Context, key string, value any) zerolog.Context {
 	// Handle special error case
 	if err, ok := value.(error); ok {
 		return ctx.AnErr(key, err)
