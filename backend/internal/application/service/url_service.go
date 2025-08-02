@@ -18,23 +18,33 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/PraveenGongada/shortly/internal/domain/interfaces"
+	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/url/cache"
 	"github.com/PraveenGongada/shortly/internal/domain/url/entity"
 	"github.com/PraveenGongada/shortly/internal/domain/url/repository"
 	"github.com/PraveenGongada/shortly/internal/domain/url/valueobject"
-	"github.com/PraveenGongada/shortly/internal/domain/shared/errors"
 	"github.com/PraveenGongada/shortly/internal/shared/utils"
 )
 
 // URLService defines the interface for URL use cases
 type URLService interface {
-	CreateShortURL(ctx context.Context, userID string, req *valueobject.CreateURLRequest) (*valueobject.CreateURLResponse, error)
+	CreateShortURL(
+		ctx context.Context,
+		userID string,
+		req *valueobject.CreateURLRequest,
+	) (*valueobject.CreateURLResponse, error)
 	GetOriginalURL(ctx context.Context, shortCode string) (string, error)
 	GetAnalytics(ctx context.Context, shortCode string, userID string) (int, error)
-	GetPaginatedURLs(ctx context.Context, userID string, limit int, offset int) ([]valueobject.URLResponse, error)
+	GetPaginatedURLs(
+		ctx context.Context,
+		userID string,
+		limit int,
+		offset int,
+	) ([]valueobject.URLResponse, error)
 	UpdateURL(ctx context.Context, urlID string, userID string, newURL string) error
 	DeleteURL(ctx context.Context, urlID string, userID string) error
 }
@@ -74,7 +84,9 @@ func (s *urlService) CreateShortURL(
 	userID string,
 	req *valueobject.CreateURLRequest,
 ) (*valueobject.CreateURLResponse, error) {
-	s.logger.Debug(ctx, "Starting short URL creation", 
+	s.logger.Info(ctx, "Processing create short URL request",
+		logger.String("service", "URLService"),
+		logger.String("operation", "CreateShortURL"),
 		logger.String("userID", userID),
 		logger.String("longURL", req.LongURL))
 
@@ -86,7 +98,7 @@ func (s *urlService) CreateShortURL(
 
 	urlResponse := valueobject.CreateShortURLResponse(url)
 
-	s.logger.Info(ctx, "Short URL created successfully",
+	s.logger.Info(ctx, "Short URL creation successful",
 		logger.String("shortCode", url.ShortCode()),
 		logger.String("urlID", url.ID()))
 
@@ -138,45 +150,35 @@ func (s *urlService) GetOriginalURL(
 	ctx context.Context,
 	shortCode string,
 ) (string, error) {
+	s.logger.Info(ctx, "Processing get original URL request",
+		logger.String("service", "URLService"),
+		logger.String("operation", "GetOriginalURL"),
+		logger.String("shortCode", shortCode))
+
 	// Try to get from cache first
 	if cachedURL, err := s.cache.GetOriginalURL(ctx, shortCode); err == nil && cachedURL != "" {
-		if err := s.repository.IncrementRedirects(ctx, shortCode); err != nil {
-			s.logger.Warn(ctx, "Failed to update redirect count", 
-				logger.String("shortCode", shortCode),
-				logger.Error(err))
-		}
-		s.logger.Debug(ctx, "Successfully retrieved long URL from cache",
-			logger.String("shortCode", shortCode),
-			logger.String("longURL", cachedURL))
+		s.logger.Debug(ctx, "URL found in cache",
+			logger.String("shortCode", shortCode))
+		s.repository.IncrementRedirects(ctx, shortCode)
 		return cachedURL, nil
 	}
 
 	// Find URL by short code in repository
 	url, err := s.repository.FindByShortCode(ctx, shortCode)
 	if err != nil {
-		s.logger.Warn(ctx, "Failed to retrieve URL",
-			logger.String("shortCode", shortCode),
-			logger.Error(err))
+		s.logger.Warn(ctx, "URL not found",
+			logger.String("shortCode", shortCode))
 		return "", errors.NotFoundError("URL not found")
 	}
 
 	// Cache the result for future requests
-	if cacheErr := s.cache.SetShortURL(ctx, shortCode, url.LongURL(), 0); cacheErr != nil {
-		s.logger.Warn(ctx, "Failed to cache URL",
-			logger.String("shortCode", shortCode),
-			logger.Error(cacheErr))
-	}
+	s.cache.SetShortURL(ctx, shortCode, url.LongURL(), time.Minute*5)
 
-	if err := s.repository.IncrementRedirects(ctx, shortCode); err != nil {
-		// Log but don't fail the request if analytics update fails
-		s.logger.Warn(ctx, "Failed to update redirect count",
-			logger.String("shortCode", shortCode),
-			logger.Error(err))
-	}
+	s.repository.IncrementRedirects(ctx, shortCode)
 
-	s.logger.Debug(ctx, "Successfully retrieved long URL",
-		logger.String("shortCode", shortCode),
-		logger.String("longURL", url.LongURL()))
+	s.logger.Info(ctx, "URL retrieval successful",
+		logger.String("shortCode", shortCode))
+
 	return url.LongURL(), nil
 }
 
@@ -234,11 +236,7 @@ func (s *urlService) UpdateURL(
 	}
 
 	// Invalidate cache
-	if cacheErr := s.cache.InvalidateShortURL(ctx, url.ShortCode()); cacheErr != nil {
-		s.logger.Warn(ctx, "Failed to invalidate cache",
-			logger.String("shortCode", url.ShortCode()),
-			logger.Error(cacheErr))
-	}
+	s.cache.InvalidateShortURL(ctx, url.ShortCode())
 
 	// Save changes
 	return s.repository.Update(ctx, url)
@@ -260,11 +258,7 @@ func (s *urlService) DeleteURL(
 	}
 
 	// Invalidate cache
-	if cacheErr := s.cache.InvalidateShortURL(ctx, url.ShortCode()); cacheErr != nil {
-		s.logger.Warn(ctx, "Failed to invalidate cache",
-			logger.String("shortCode", url.ShortCode()),
-			logger.Error(cacheErr))
-	}
+	s.cache.InvalidateShortURL(ctx, url.ShortCode())
 
 	return s.repository.Delete(ctx, urlID, userID)
 }

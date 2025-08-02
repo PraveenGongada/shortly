@@ -46,7 +46,7 @@ func (h *Handler) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 	var req valueobject.CreateURLRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Warn(r.Context(), "Invalid request payload",
-			logger.String("handler", "CreateShortUrl"),
+			logger.String("handler", "CreateShortURL"),
 			logger.Error(err))
 		response.Err(w, errors.ValidationError("Invalid request format"))
 		return
@@ -54,20 +54,16 @@ func (h *Handler) CreateShortURL(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Header.Get("id")
 
+	h.logger.Info(r.Context(), "Processing create short URL request",
+		logger.String("handler", "CreateShortURL"),
+		logger.String("userID", userID),
+		logger.String("longURL", req.LongURL))
+
 	urlResponse, err := h.urlService.CreateShortURL(r.Context(), userID, &req)
 	if err != nil {
-		h.logger.Error(r.Context(), "Service layer error creating short URL",
-			logger.String("handler", "CreateShortUrl"),
-			logger.String("userID", userID),
-			logger.Error(err))
 		response.Err(w, err)
 		return
 	}
-
-	h.logger.Info(r.Context(), "Short URL created",
-		logger.String("handler", "CreateShortUrl"),
-		logger.String("shortCode", urlResponse.ShortCode),
-		logger.String("urlID", urlResponse.ID))
 
 	response.Json(w, http.StatusCreated, "Short URL created successfully", urlResponse)
 }
@@ -89,20 +85,19 @@ func (h *Handler) RedirectUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Info(r.Context(), "Processing redirect request",
+		logger.String("handler", "RedirectUser"),
+		logger.String("shortCode", shortCode))
+
 	longURL, err := h.urlService.GetOriginalURL(r.Context(), shortCode)
 	if err != nil {
-		h.logger.Warn(r.Context(), "Redirect failed",
-			logger.String("handler", "RedirectUser"),
-			logger.String("shortCode", shortCode),
-			logger.Error(err))
 		response.Err(w, err)
 		return
 	}
 
-	h.logger.Info(r.Context(), "Redirected",
+	h.logger.Info(r.Context(), "Redirect successful",
 		logger.String("handler", "RedirectUser"),
-		logger.String("shortCode", shortCode),
-		logger.String("longURL", longURL))
+		logger.String("shortCode", shortCode))
 	http.Redirect(w, r, longURL, http.StatusFound)
 }
 
@@ -118,6 +113,10 @@ func (h *Handler) RedirectUser(w http.ResponseWriter, r *http.Request) {
 // @Router /{shortUrl} [get]
 func (h *Handler) GetLongURL(w http.ResponseWriter, r *http.Request) {
 	shortCode := chi.URLParam(r, "shortUrl")
+
+	h.logger.Info(r.Context(), "Processing get long URL request",
+		logger.String("handler", "GetLongURL"),
+		logger.String("shortCode", shortCode))
 
 	longURL, err := h.urlService.GetOriginalURL(r.Context(), shortCode)
 	if err != nil {
@@ -143,6 +142,11 @@ func (h *Handler) GetLongURL(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
 	shortCode := chi.URLParam(r, "shortUrl")
 	userID := r.Header.Get("id")
+
+	h.logger.Info(r.Context(), "Processing analytics request",
+		logger.String("handler", "GetAnalytics"),
+		logger.String("shortCode", shortCode),
+		logger.String("userID", userID))
 
 	count, err := h.urlService.GetAnalytics(r.Context(), shortCode, userID)
 	if err != nil {

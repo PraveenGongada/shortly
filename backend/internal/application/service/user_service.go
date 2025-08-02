@@ -77,9 +77,6 @@ func (s *userService) Login(
 
 	user, err := s.repository.FindByEmail(ctx, req.Email)
 	if err != nil {
-		s.logger.Warn(ctx, "User lookup failed",
-			logger.String("emailHash", emailHash),
-			logger.Error(err))
 		return nil, errors.UnauthorizedError("invalid email or password")
 	}
 
@@ -119,9 +116,6 @@ func (s *userService) Register(
 	// Check if user already exists
 	exists, err := s.repository.ExistsByEmail(ctx, req.Email)
 	if err != nil {
-		s.logger.Error(ctx, "Error checking user existence",
-			logger.String("operation", "Register"),
-			logger.Error(err))
 		return nil, errors.InternalError("database query failed")
 	}
 	if exists {
@@ -143,9 +137,6 @@ func (s *userService) Register(
 	// Save user
 	savedUser, err := s.repository.Save(ctx, user)
 	if err != nil {
-		s.logger.Error(ctx, "Failed to save user",
-			logger.String("operation", "Register"),
-			logger.Error(err))
 		return nil, errors.InternalError("save operation failed")
 	}
 
