@@ -21,11 +21,19 @@ package wire
 
 import (
 	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/cache/redis"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
+	"github.com/PraveenGongada/shortly/internal/infrastructure/persistence/postgres"
 	"github.com/google/wire"
 )
 
-func InitializeApplication(domainLogger logger.Logger) (*handler.Handler, error) {
-	wire.Build(FullApplicationSet)
-	return &handler.Handler{}, nil
+type Application struct {
+	Handler        *handler.Handler
+	PostgresClient postgres.Store
+	RedisClient    redis.Client
+}
+
+func InitializeApplication(domainLogger logger.Logger) (*Application, error) {
+	wire.Build(FullApplicationSet, wire.Struct(new(Application), "*"))
+	return &Application{}, nil
 }

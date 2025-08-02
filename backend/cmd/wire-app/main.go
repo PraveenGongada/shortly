@@ -57,13 +57,13 @@ func main() {
 	domainLogger := zerolog.NewWithLogger(logger)
 
 	// Initialize the complete application using Wire
-	handlers, err := wireProviders.InitializeApplication(domainLogger)
+	app, err := wireProviders.InitializeApplication(domainLogger)
 	if err != nil {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 
 	// Initialize HTTP layer (these remain manual as they're infrastructure wiring)
-	routerInstance := router.New(handlers, securityConfig, domainLogger)
+	routerInstance := router.New(app.Handler, securityConfig, domainLogger)
 	server := http.New(routerInstance, domainLogger, serverConfig)
 
 	// Set up graceful shutdown with proper context handling
@@ -75,6 +75,13 @@ func main() {
 		map[string]graceful.Operation{
 			"http": func(ctx context.Context) error {
 				return server.Shutdown(ctx)
+			},
+			"postgres": func(ctx context.Context) error {
+				app.PostgresClient.Close()
+				return nil
+			},
+			"redis": func(ctx context.Context) error {
+				return app.RedisClient.Close()
 			},
 		},
 		domainLogger,

@@ -30,6 +30,7 @@ import (
 type Store interface {
 	Pool() *pgxpool.Pool
 	GetQueryTimeout() time.Duration
+	Close()
 }
 
 type store struct {
@@ -43,6 +44,10 @@ func (s *store) Pool() *pgxpool.Pool {
 
 func (s *store) GetQueryTimeout() time.Duration {
 	return s.queryTimeout
+}
+
+func (s *store) Close() {
+	s.pool.Close()
 }
 
 func NewPostgresClient(log logger.Logger, dbConfig config.DatabaseConfig) Store {

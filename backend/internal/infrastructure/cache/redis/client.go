@@ -29,6 +29,7 @@ import (
 
 type Client interface {
 	Client() *redis.Client
+	Close() error
 }
 
 type client struct {
@@ -37,6 +38,10 @@ type client struct {
 
 func (c *client) Client() *redis.Client {
 	return c.rdb
+}
+
+func (c *client) Close() error {
+	return c.rdb.Close()
 }
 
 func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {

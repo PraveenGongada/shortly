@@ -60,10 +60,10 @@ func main() {
 	authConfig := config.NewAuthConfigAdapter(cfg, secrets)
 	urlConfig := config.NewURLConfigAdapter(cfg)
 	serverConfig := config.NewServerConfigAdapter(cfg)
-	
+
 	// Initialize logger with config
 	logger := zerolog.InitLogger(logConfig)
-	
+
 	// Initialize domain logger adapter
 	domainLogger := zerolog.NewWithLogger(logger)
 
@@ -74,7 +74,7 @@ func main() {
 	cookieManager := cookie.NewCookieManager(authConfig)
 
 	// Initialize cache
-	urlCache := redis.NewURLCache(redisClient)
+	urlCache := redis.NewURLCache(redisClient, domainLogger)
 
 	// Initialize domain services
 	urlGenerator := urlDomainService.NewGenerator(urlConfig.ShortURLLength())
@@ -87,7 +87,13 @@ func main() {
 	urlRepository := postgres.NewURLRepository(postgresClient, domainLogger)
 
 	// Initialize application services (use case implementations)
-	userService := service.NewUserService(userValidator, userHasher, userRepository, tokenGenerator, domainLogger)
+	userService := service.NewUserService(
+		userValidator,
+		userHasher,
+		userRepository,
+		tokenGenerator,
+		domainLogger,
+	)
 	urlService := service.NewURLService(
 		urlGenerator,
 		urlValidator,
@@ -111,6 +117,13 @@ func main() {
 		map[string]graceful.Operation{
 			"http": func(ctx context.Context) error {
 				return server.Shutdown(ctx)
+			},
+			"postgres": func(ctx context.Context) error {
+				postgresClient.Close()
+				return nil
+			},
+			"redis": func(ctx context.Context) error {
+				return redisClient.Close()
 			},
 		},
 		domainLogger,
