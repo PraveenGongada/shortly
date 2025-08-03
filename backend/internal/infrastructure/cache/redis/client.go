@@ -28,15 +28,15 @@ import (
 )
 
 type Client interface {
-	Client() *redis.Client
+	Client() redis.UniversalClient
 	Close() error
 }
 
 type client struct {
-	rdb *redis.Client
+	rdb redis.UniversalClient
 }
 
-func (c *client) Client() *redis.Client {
+func (c *client) Client() redis.UniversalClient {
 	return c.rdb
 }
 
@@ -47,10 +47,14 @@ func (c *client) Close() error {
 func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 	log.Info(context.Background(), "Initializing Redis connection...")
 
-	addr := fmt.Sprintf("%s:%s", redisConfig.Host(), strconv.Itoa(redisConfig.Port()))
+	addrs := redisConfig.Addrs()
+	if len(addrs) == 0 {
+		addr := fmt.Sprintf("%s:%s", redisConfig.Host(), strconv.Itoa(redisConfig.Port()))
+		addrs = []string{addr}
+	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:            addr,
+	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
+		Addrs:           addrs,
 		Password:        redisConfig.Password(),
 		DB:              redisConfig.Database(),
 		DialTimeout:     redisConfig.DialTimeout(),
@@ -68,10 +72,9 @@ func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Error(context.Background(), "Error connecting to Redis", logger.Error(err))
-		panic(err) // Fatal error during initialization
+		panic(err)
 	}
 
-	log.Info(context.Background(), "Success connecting to Redis")
-
+	log.Info(context.Background(), "Successfully connected to Redis")
 	return &client{rdb: rdb}
 }

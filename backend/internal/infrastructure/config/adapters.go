@@ -43,6 +43,7 @@ func NewRedisConfigAdapter(cfg *Config, secrets SecretProvider) domainConfig.Red
 
 func (r *RedisConfigAdapter) Host() string               { return r.config.Database.Redis.Host }
 func (r *RedisConfigAdapter) Port() int                  { return r.config.Database.Redis.Port }
+func (r *RedisConfigAdapter) Addrs() []string            { return r.config.Database.Redis.Addrs }
 func (r *RedisConfigAdapter) Database() int              { return r.config.Database.Redis.Database }
 func (r *RedisConfigAdapter) Password() string           { return r.secrets.GetRedisPassword() }
 func (r *RedisConfigAdapter) DialTimeout() time.Duration { return r.config.Database.Redis.DialTimeout }

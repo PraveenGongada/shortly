@@ -74,6 +74,7 @@ type LogConfig interface {
 type RedisConfig interface {
 	Host() string
 	Port() int
+	Addrs() []string
 	Database() int
 	Password() string
 	DialTimeout() time.Duration

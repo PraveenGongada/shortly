@@ -84,6 +84,7 @@ type RedisPoolConfig struct {
 type RedisConfig struct {
 	Host         string          `yaml:"host" mapstructure:"HOST" validate:"required"`
 	Port         int             `yaml:"port" mapstructure:"PORT" validate:"required,min=1,max=65535"`
+	Addrs        []string        `yaml:"addrs" mapstructure:"ADDRS"`
 	Database     int             `yaml:"database" mapstructure:"DATABASE" validate:"min=0,max=15"`
 	Password     string          `yaml:"password" mapstructure:"PASSWORD"`
 	DialTimeout  time.Duration   `yaml:"dial_timeout" mapstructure:"DIAL_TIMEOUT" validate:"required"`
@@ -104,7 +105,6 @@ type CORSConfig struct {
 	AllowCredentials bool     `yaml:"allow_credentials" mapstructure:"ALLOW_CREDENTIALS"`
 	MaxAge           int      `yaml:"max_age" mapstructure:"MAX_AGE" validate:"min=0"`
 }
-
 
 type SecurityConfig struct {
 	CORS           CORSConfig    `yaml:"cors" mapstructure:"CORS"`
@@ -252,9 +252,10 @@ func (l *Loader) setDefaults(v *viper.Viper) {
 	// Redis defaults
 	v.SetDefault("Database.REDIS.HOST", "localhost")
 	v.SetDefault("Database.REDIS.PORT", 6379)
+	v.SetDefault("Database.REDIS.ADDRS", []string{})
 	v.SetDefault("Database.REDIS.DATABASE", 0)
 	v.SetDefault("Database.REDIS.PASSWORD", "")
-	v.SetDefault("Database.REDIS.DIAL_TIMEOUT", "5s")
+	v.SetDefault("Database.REDIS.DIAL_TIMEOUT", "30s")
 	v.SetDefault("Database.REDIS.READ_TIMEOUT", "3s")
 	v.SetDefault("Database.REDIS.WRITE_TIMEOUT", "3s")
 	v.SetDefault("Database.REDIS.POOL.MAX_IDLE", 10)
