@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: "3.8"
 
 services:
   postgres:
@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - postgres_data:/var/lib/postgres/data
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: bitnami/redis:latest
@@ -52,13 +52,13 @@ services:
         "-path",
         "/migrations",
         "-database",
-        "postgresql://postgres:password@postgres/postgres?sslmode=disable",
+        "postgresql://postgres:password@postgres:5432/shortly?sslmode=disable",
       ]
     command: ["up"]
     depends_on:
       postgres:
         condition: service_healthy
-    restart: on_failure
+    restart: on-failure
 
 networks:
   shortly_network:
