@@ -18,6 +18,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"strconv"
 
@@ -55,6 +56,7 @@ func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 
 	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
 		Addrs:           addrs,
+		Username:        redisConfig.UserName(),
 		Password:        redisConfig.Password(),
 		DB:              redisConfig.Database(),
 		DialTimeout:     redisConfig.DialTimeout(),
@@ -64,6 +66,9 @@ func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 		MinIdleConns:    redisConfig.MaxIdle(),
 		ConnMaxIdleTime: redisConfig.IdleTimeout(),
 		ConnMaxLifetime: redisConfig.MaxConnLifetime(),
+		TLSConfig: &tls.Config{
+			ServerName: redisConfig.Host(),
+		},
 	})
 
 	// Test the connection

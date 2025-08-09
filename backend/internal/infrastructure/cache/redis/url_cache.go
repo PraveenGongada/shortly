@@ -20,9 +20,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/domain/url/cache"
-	"github.com/redis/go-redis/v9"
 )
 
 type urlCache struct {
@@ -44,21 +45,21 @@ func (uc *urlCache) SetShortURL(
 ) error {
 	err := uc.client.Client().Set(ctx, shortCode, originalURL, ttl).Err()
 	if err != nil {
-		uc.logger.Error(ctx, "Error setting shortURL in cache", 
+		uc.logger.Error(ctx, "Error setting shortURL in cache",
 			logger.String("shortCode", shortCode),
 			logger.String("operation", "SetShortURL"),
 			logger.Error(err),
 		)
 		return err
 	}
-	
+
 	return nil
 }
 
 func (uc *urlCache) GetOriginalURL(ctx context.Context, shortCode string) (string, error) {
 	url, err := uc.client.Client().Get(ctx, shortCode).Result()
 	if err != nil {
-		uc.logger.Error(ctx, "Error getting shortURL in cache", 
+		uc.logger.Error(ctx, "Error getting shortURL in cache",
 			logger.String("shortCode", shortCode),
 			logger.String("operation", "GetOriginalURL"),
 			logger.Error(err),
@@ -72,7 +73,7 @@ func (uc *urlCache) GetOriginalURL(ctx context.Context, shortCode string) (strin
 func (uc *urlCache) InvalidateShortURL(ctx context.Context, shortCode string) error {
 	err := uc.client.Client().Del(ctx, shortCode).Err()
 	if err != redis.Nil && err != nil {
-		uc.logger.Error(ctx, "Error invalidating shortURL in cache", 
+		uc.logger.Error(ctx, "Error invalidating shortURL in cache",
 			logger.String("shortCode", shortCode),
 			logger.String("operation", "InvalidateShortURL"),
 			logger.Error(err),

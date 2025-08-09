@@ -73,6 +73,7 @@ type LogConfig interface {
 // RedisConfig defines configuration needed for Redis cache
 type RedisConfig interface {
 	Host() string
+	UserName() string
 	Port() int
 	Addrs() []string
 	Database() int
