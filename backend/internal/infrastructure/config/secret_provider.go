@@ -48,11 +48,9 @@ func NewEnvSecretProvider() (*EnvSecretProvider, error) {
 		return nil, fmt.Errorf("POSTGRES_PASSWORD environment variable is required")
 	}
 
-	// Load RSA keys if available (non-fatal if missing)
+	// Load RSA keys
 	if err := provider.loadRSAKeys(); err != nil {
-		// RSA key loading failed - this is non-fatal during initialization
-		// The error will be handled when keys are actually needed
-		_ = err
+		return nil, fmt.Errorf("failed to load RSA keys: %w", err)
 	}
 
 	return provider, nil
@@ -67,6 +65,9 @@ func (e *EnvSecretProvider) GetDatabasePassword() string {
 }
 
 func (e *EnvSecretProvider) GetRSAPublicKey() *rsa.PublicKey {
+	if e.rsaPublicKey == nil {
+		panic("RSA public key not loaded - check JWT_PUBLIC_KEY_PATH configuration")
+	}
 	return e.rsaPublicKey
 }
 
@@ -75,6 +76,9 @@ func (e *EnvSecretProvider) GetRedisPassword() string {
 }
 
 func (e *EnvSecretProvider) GetRSAPrivateKey() *rsa.PrivateKey {
+	if e.rsaPrivateKey == nil {
+		panic("RSA private key not loaded - check JWT_PRIVATE_KEY_PATH configuration")
+	}
 	return e.rsaPrivateKey
 }
 
@@ -82,21 +86,24 @@ func (e *EnvSecretProvider) loadRSAKeys() error {
 	publicKeyPath := os.Getenv("JWT_PUBLIC_KEY_PATH")
 	privateKeyPath := os.Getenv("JWT_PRIVATE_KEY_PATH")
 
-	if publicKeyPath != "" {
-		publicKey, err := loadRSAPublicKeyFromFile(publicKeyPath)
-		if err != nil {
-			return fmt.Errorf("failed to load RSA public key from %s: %w", publicKeyPath, err)
-		}
-		e.rsaPublicKey = publicKey
+	if publicKeyPath == "" {
+		return fmt.Errorf("JWT_PUBLIC_KEY_PATH environment variable is required")
+	}
+	if privateKeyPath == "" {
+		return fmt.Errorf("JWT_PRIVATE_KEY_PATH environment variable is required")
 	}
 
-	if privateKeyPath != "" {
-		privateKey, err := loadRSAPrivateKeyFromFile(privateKeyPath)
-		if err != nil {
-			return fmt.Errorf("failed to load RSA private key from %s: %w", privateKeyPath, err)
-		}
-		e.rsaPrivateKey = privateKey
+	publicKey, err := loadRSAPublicKeyFromFile(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to load RSA public key from %s: %w", publicKeyPath, err)
 	}
+	e.rsaPublicKey = publicKey
+
+	privateKey, err := loadRSAPrivateKeyFromFile(privateKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to load RSA private key from %s: %w", privateKeyPath, err)
+	}
+	e.rsaPrivateKey = privateKey
 
 	return nil
 }

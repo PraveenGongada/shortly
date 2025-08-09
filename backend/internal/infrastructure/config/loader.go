@@ -68,7 +68,7 @@ type PostgresConfig struct {
 	Host           string             `yaml:"host" mapstructure:"HOST" validate:"required"`
 	Port           int                `yaml:"port" mapstructure:"PORT" validate:"required,min=1,max=65535"`
 	Name           string             `yaml:"name" mapstructure:"NAME" validate:"required"`
-	SSLMode        string             `yaml:"ssl_mode" mapstructure:"SSL" validate:"required,oneof=disable require verify-ca verify-full"`
+	SSLMode        string             `yaml:"ssl_mode" mapstructure:"SSL_MODE" validate:"required,oneof=disable require verify-ca verify-full"`
 	Pool           PostgresPoolConfig `yaml:"pool" mapstructure:"POOL"`
 	QueryTimeout   time.Duration      `yaml:"query_timeout" mapstructure:"QUERY_TIMEOUT" validate:"required"`
 	ConnectTimeout time.Duration      `yaml:"connect_timeout" mapstructure:"CONNECT_TIMEOUT" validate:"required"`
@@ -137,7 +137,6 @@ func NewLoader(configPaths []string, envPrefix string) *Loader {
 func (l *Loader) Load() (*Config, error) {
 	v := viper.New()
 
-	l.setDefaults(v)
 	l.configureViper(v)
 
 	// Try to read main config file first
@@ -145,7 +144,7 @@ func (l *Loader) Load() (*Config, error) {
 		// If main config file not found, try to read modular config files
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			if err := l.loadModularConfigs(v); err != nil {
-				// If both main config and modular configs fail, continue with defaults
+				return nil, fmt.Errorf("no configuration files found in paths %v: main config and modular configs both failed: %w", l.configPaths, err)
 			}
 		} else {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -166,6 +165,8 @@ func (l *Loader) Load() (*Config, error) {
 
 func (l *Loader) loadModularConfigs(v *viper.Viper) error {
 	configFiles := []string{"application", "auth", "database", "logging", "security"}
+	foundFiles := make([]string, 0)
+	missingFiles := make([]string, 0)
 
 	for _, configFile := range configFiles {
 		configViper := viper.New()
@@ -177,17 +178,22 @@ func (l *Loader) loadModularConfigs(v *viper.Viper) error {
 		}
 
 		if err := configViper.ReadInConfig(); err != nil {
-			// Continue if file doesn't exist
 			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+				missingFiles = append(missingFiles, configFile+".yaml")
 				continue
 			}
 			return fmt.Errorf("failed to read config file %s: %w", configFile, err)
 		}
 
+		foundFiles = append(foundFiles, configFile+".yaml")
 		// Merge settings from this config file
 		if err := v.MergeConfigMap(configViper.AllSettings()); err != nil {
 			return fmt.Errorf("failed to merge config from %s: %w", configFile, err)
 		}
+	}
+
+	if len(missingFiles) > 0 {
+		return fmt.Errorf("required configuration files not found: %v (found: %v) in paths: %v", missingFiles, foundFiles, l.configPaths)
 	}
 
 	return nil
@@ -211,63 +217,4 @@ func (l *Loader) configureViper(v *viper.Viper) {
 func (l *Loader) validate(config *Config) error {
 	validate := validator.New()
 	return validate.Struct(config)
-}
-
-func (l *Loader) setDefaults(v *viper.Viper) {
-	// Application defaults
-	v.SetDefault("APPLICATION.PORT", 8080)
-	v.SetDefault("APPLICATION.SHORT_URL_LENGTH", 7)
-	v.SetDefault("APPLICATION.MAX_COLLISION_RETRIES", 3)
-	v.SetDefault("APPLICATION.ENVIRONMENT", "DEVELOPMENT")
-	v.SetDefault("APPLICATION.GRACEFUL.MAX_SECOND", "30s")
-
-	// Logging defaults
-	v.SetDefault("LOGGING.LEVEL", "info")
-	v.SetDefault("LOGGING.FORMAT", "json")
-	v.SetDefault("LOGGING.OUTPUT", "stdout")
-	v.SetDefault("LOGGING.CALLER", true)
-	v.SetDefault("LOGGING.TIMESTAMP", true)
-	v.SetDefault("LOGGING.TIMESTAMP_FORMAT", "2006-01-02T15:04:05Z07:00")
-
-	// Auth defaults
-	v.SetDefault("AUTH.JWT_TOKEN.TYPE", "Bearer")
-	v.SetDefault("AUTH.JWT_TOKEN.EXPIRED", "24h")
-	v.SetDefault("AUTH.JWT_TOKEN.REFRESH_EXPIRED", "168h")
-
-	// Database defaults
-	v.SetDefault("Database.POSTGRES.HOST", "localhost")
-	v.SetDefault("Database.POSTGRES.PORT", 5432)
-	v.SetDefault("Database.POSTGRES.NAME", "shortly")
-	v.SetDefault("Database.POSTGRES.SSL", "disable")
-	v.SetDefault("Database.POSTGRES.QUERY_TIMEOUT", "5s")
-	v.SetDefault("Database.POSTGRES.CONNECT_TIMEOUT", "10s")
-
-	// Pool defaults
-	v.SetDefault("Database.POSTGRES.POOL.MAX_CONNS", 25)
-	v.SetDefault("Database.POSTGRES.POOL.MIN_CONNS", 5)
-	v.SetDefault("Database.POSTGRES.POOL.MAX_CONN_LIFETIME", "1h")
-	v.SetDefault("Database.POSTGRES.POOL.MAX_CONN_IDLE_TIME", "15m")
-	v.SetDefault("Database.POSTGRES.POOL.HEALTH_CHECK_PERIOD", "2m")
-
-	// Redis defaults
-	v.SetDefault("Database.REDIS.HOST", "localhost")
-	v.SetDefault("Database.REDIS.PORT", 6379)
-	v.SetDefault("Database.REDIS.ADDRS", []string{})
-	v.SetDefault("Database.REDIS.DATABASE", 0)
-	v.SetDefault("Database.REDIS.PASSWORD", "")
-	v.SetDefault("Database.REDIS.DIAL_TIMEOUT", "30s")
-	v.SetDefault("Database.REDIS.READ_TIMEOUT", "3s")
-	v.SetDefault("Database.REDIS.WRITE_TIMEOUT", "3s")
-	v.SetDefault("Database.REDIS.POOL.MAX_IDLE", 10)
-	v.SetDefault("Database.REDIS.POOL.MAX_ACTIVE", 100)
-	v.SetDefault("Database.REDIS.POOL.IDLE_TIMEOUT", "240s")
-	v.SetDefault("Database.REDIS.POOL.MAX_CONN_LIFETIME", "1h")
-
-	// Security defaults
-	v.SetDefault("SECURITY.CORS.ALLOWED_ORIGINS", []string{"http://localhost:3000"})
-	v.SetDefault("SECURITY.CORS.ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
-	v.SetDefault("SECURITY.CORS.ALLOWED_HEADERS", []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"})
-	v.SetDefault("SECURITY.CORS.ALLOW_CREDENTIALS", true)
-	v.SetDefault("SECURITY.CORS.MAX_AGE", 300)
-	v.SetDefault("SECURITY.REQUEST_TIMEOUT", "30s")
 }

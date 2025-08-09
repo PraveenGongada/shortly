@@ -59,7 +59,6 @@ func (m *Manager) LoadSecrets() (SecretProvider, error) {
 func LoadGlobalConfig() (*Config, error) {
 	var err error
 	configOnce.Do(func() {
-		// Load .env file if it exists (suppress errors during bootstrap)
 		_ = godotenv.Load()
 
 		manager := NewManager([]string{".", "/etc/shortly/", "configs/"}, "")
@@ -71,7 +70,6 @@ func LoadGlobalConfig() (*Config, error) {
 func LoadGlobalSecrets() (SecretProvider, error) {
 	var err error
 	secretsOnce.Do(func() {
-		// Load .env file if it exists (suppress errors during bootstrap)
 		_ = godotenv.Load()
 
 		globalSecrets, err = NewEnvSecretProvider()
