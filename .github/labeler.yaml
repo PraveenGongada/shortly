@@ -1,6 +1,6 @@
 frontend:
   - changed-files:
-    - any-glob-to-any-file: 
+    - any-glob-to-any-file:
       - 'frontend/**/*'
 
 backend:
@@ -14,7 +14,7 @@ infra:
       - 'infra/**/*'
 
 feature:
-  - head-branch: 
+  - head-branch:
     - '^feature\/.*'
     - '^feat\/.*'
 
