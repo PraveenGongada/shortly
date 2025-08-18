@@ -222,5 +222,5 @@ Third-party library attributions can be found in the [NOTICE](NOTICE) file.
 ---
 
 <div align="center">
-Built with ❤️ by <a href="https://github.com/PraveenGongada">Praveen Kumar</a>
+Built with ❤️ by <a href="https://praveengongada.com">Praveen Kumar</a>
 </div>
