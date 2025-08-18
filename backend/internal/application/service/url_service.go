@@ -67,7 +67,7 @@ func NewURLService(
 	maxRetries int,
 ) URLService {
 	if maxRetries <= 0 {
-		maxRetries = 5
+		maxRetries = 1
 	}
 	return &urlService{
 		generator:  generator,
