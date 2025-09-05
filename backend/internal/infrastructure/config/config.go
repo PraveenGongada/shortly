@@ -61,7 +61,7 @@ func LoadGlobalConfig() (*Config, error) {
 	configOnce.Do(func() {
 		_ = godotenv.Load()
 
-		manager := NewManager([]string{".", "/etc/shortly/", "configs/"}, "")
+		manager := NewManager([]string{".", ConfigsPath}, "")
 		globalConfig, err = manager.LoadConfig()
 	})
 	return globalConfig, err

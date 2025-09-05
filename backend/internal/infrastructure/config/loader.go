@@ -126,9 +126,6 @@ type Loader struct {
 }
 
 func NewLoader(configPaths []string, envPrefix string) *Loader {
-	if len(configPaths) == 0 {
-		configPaths = []string{".", "/etc/shortly/", "configs/"}
-	}
 	return &Loader{
 		configPaths: configPaths,
 		envPrefix:   envPrefix,
