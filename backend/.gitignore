@@ -14,9 +14,6 @@ bin/
 temp/air/*
 !temp/air/.gitkeep
 
-# ignore wire
-wire_gen.go
-
 #DS Store
 .DS_Store
 
