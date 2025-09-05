@@ -1,3 +1,5 @@
+//go:generate go run github.com/google/wire/cmd/wire
+
 /*
  * Copyright 2025 Praveen Kumar
  *

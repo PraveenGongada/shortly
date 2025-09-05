@@ -18,20 +18,14 @@ package main
 
 import (
 	"context"
+	"log"
 
 	_ "github.com/PraveenGongada/shortly/api"
-	"github.com/PraveenGongada/shortly/internal/application/service"
-	urlDomainService "github.com/PraveenGongada/shortly/internal/domain/url/service"
-	userDomainService "github.com/PraveenGongada/shortly/internal/domain/user/service"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/auth"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/cache/redis"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/http/cookie"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/http/handler"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/logging/zerolog"
-	"github.com/PraveenGongada/shortly/internal/infrastructure/persistence/postgres"
+	wireProviders "github.com/PraveenGongada/shortly/internal/infrastructure/wire"
 	"github.com/PraveenGongada/shortly/internal/shared/graceful"
 )
 
@@ -50,16 +44,11 @@ import (
 // @host localhost:8080
 // @BasePath /api
 func main() {
-	// Load configuration and create adapters
+	// Load configuration
 	cfg := config.GetGlobalConfig()
-	secrets := config.GetGlobalSecrets()
 	logConfig := config.NewLogConfigAdapter(cfg)
-	dbConfig := config.NewDatabaseConfigAdapter(cfg, secrets)
-	redisConfig := config.NewRedisConfigAdapter(cfg, secrets)
-	securityConfig := config.NewSecurityConfigAdapter(cfg)
-	authConfig := config.NewAuthConfigAdapter(cfg, secrets)
-	urlConfig := config.NewURLConfigAdapter(cfg)
 	serverConfig := config.NewServerConfigAdapter(cfg)
+	securityConfig := config.NewSecurityConfigAdapter(cfg)
 
 	// Initialize logger with config
 	logger := zerolog.InitLogger(logConfig)
@@ -67,45 +56,14 @@ func main() {
 	// Initialize domain logger adapter
 	domainLogger := zerolog.NewWithLogger(logger)
 
-	// Initialize infrastructure layer
-	postgresClient := postgres.NewPostgresClient(domainLogger, dbConfig)
-	redisClient := redis.NewClient(domainLogger, redisConfig)
-	tokenGenerator := auth.NewJwtTokenGenerator(domainLogger, authConfig)
-	cookieManager := cookie.NewCookieManager(authConfig)
+	// Initialize the complete application using Wire
+	app, err := wireProviders.InitializeApplication(domainLogger)
+	if err != nil {
+		log.Fatalf("Failed to initialize application: %v", err)
+	}
 
-	// Initialize cache
-	urlCache := redis.NewURLCache(redisClient, domainLogger)
-
-	// Initialize domain services
-	urlGenerator := urlDomainService.NewGenerator(urlConfig.ShortURLLength())
-	urlValidator := urlDomainService.NewValidator()
-	userValidator := userDomainService.NewValidator()
-	userHasher := userDomainService.NewHasher()
-
-	// Initialize repositories (infrastructure implementations of domain interfaces)
-	userRepository := postgres.NewUserRepository(postgresClient, domainLogger)
-	urlRepository := postgres.NewURLRepository(postgresClient, domainLogger)
-
-	// Initialize application services (use case implementations)
-	userService := service.NewUserService(
-		userValidator,
-		userHasher,
-		userRepository,
-		tokenGenerator,
-		domainLogger,
-	)
-	urlService := service.NewURLService(
-		urlGenerator,
-		urlValidator,
-		urlRepository,
-		urlCache,
-		domainLogger,
-		urlConfig.MaxCollisionRetries(),
-	)
-
-	// Initialize HTTP layer
-	handlers := handler.New(userService, urlService, cookieManager, domainLogger, authConfig)
-	routerInstance := router.New(handlers, securityConfig, domainLogger)
+	// Initialize HTTP layer (these remain manual as they're infrastructure wiring)
+	routerInstance := router.New(app.Handler, securityConfig, domainLogger)
 	server := http.New(routerInstance, domainLogger, serverConfig)
 
 	// Set up graceful shutdown with proper context handling
@@ -119,11 +77,11 @@ func main() {
 				return server.Shutdown(ctx)
 			},
 			"postgres": func(ctx context.Context) error {
-				postgresClient.Close()
+				app.PostgresClient.Close()
 				return nil
 			},
 			"redis": func(ctx context.Context) error {
-				return redisClient.Close()
+				return app.RedisClient.Close()
 			},
 		},
 		domainLogger,
