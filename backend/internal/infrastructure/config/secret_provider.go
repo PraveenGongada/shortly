@@ -83,25 +83,15 @@ func (e *EnvSecretProvider) GetRSAPrivateKey() *rsa.PrivateKey {
 }
 
 func (e *EnvSecretProvider) loadRSAKeys() error {
-	publicKeyPath := os.Getenv("JWT_PUBLIC_KEY_PATH")
-	privateKeyPath := os.Getenv("JWT_PRIVATE_KEY_PATH")
-
-	if publicKeyPath == "" {
-		return fmt.Errorf("JWT_PUBLIC_KEY_PATH environment variable is required")
-	}
-	if privateKeyPath == "" {
-		return fmt.Errorf("JWT_PRIVATE_KEY_PATH environment variable is required")
-	}
-
-	publicKey, err := loadRSAPublicKeyFromFile(publicKeyPath)
+	publicKey, err := loadRSAPublicKeyFromFile(RSAPublicKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed to load RSA public key from %s: %w", publicKeyPath, err)
+		return fmt.Errorf("failed to load RSA public key from %s: %w", RSAPublicKeyPath, err)
 	}
 	e.rsaPublicKey = publicKey
 
-	privateKey, err := loadRSAPrivateKeyFromFile(privateKeyPath)
+	privateKey, err := loadRSAPrivateKeyFromFile(RSAPrivateKeyPath)
 	if err != nil {
-		return fmt.Errorf("failed to load RSA private key from %s: %w", privateKeyPath, err)
+		return fmt.Errorf("failed to load RSA private key from %s: %w", RSAPrivateKeyPath, err)
 	}
 	e.rsaPrivateKey = privateKey
 
