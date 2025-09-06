@@ -3,10 +3,8 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/docs/images/logo.svg" alt="Shortly Logo" width="200" />
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.2.0-black?style=flat-square&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-^5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![Go](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-latest-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org)
+[![Backend Build](https://img.shields.io/github/actions/workflow/status/PraveenGongada/Shortly/backend-build.yaml?style=flat-square&logo=github&label=backend)](https://github.com/PraveenGongada/Shortly/actions)
+[![Frontend Build](https://img.shields.io/github/actions/workflow/status/PraveenGongada/Shortly/frontend-build.yaml?style=flat-square&logo=github&label=frontend)](https://github.com/PraveenGongada/Shortly/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square)](LICENSE)
 
   <p></p>
