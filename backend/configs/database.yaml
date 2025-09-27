@@ -21,6 +21,7 @@ database:
     dial_timeout: 5s
     read_timeout: 3s
     write_timeout: 3s
+    tls_enabled: false
     pool:
       max_idle: 10
       max_active: 100

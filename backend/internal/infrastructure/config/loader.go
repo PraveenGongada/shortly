@@ -91,6 +91,7 @@ type RedisConfig struct {
 	DialTimeout  time.Duration   `yaml:"dial_timeout"  mapstructure:"DIAL_TIMEOUT"  validate:"required"`
 	ReadTimeout  time.Duration   `yaml:"read_timeout"  mapstructure:"READ_TIMEOUT"  validate:"required"`
 	WriteTimeout time.Duration   `yaml:"write_timeout" mapstructure:"WRITE_TIMEOUT" validate:"required"`
+	TLSEnabled   bool            `yaml:"tls_enabled"   mapstructure:"TLS_ENABLED"`
 	Pool         RedisPoolConfig `yaml:"pool"          mapstructure:"POOL"`
 }
 

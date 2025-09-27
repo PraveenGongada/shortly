@@ -54,7 +54,7 @@ func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 		addrs = []string{addr}
 	}
 
-	rdb := redis.NewUniversalClient(&redis.UniversalOptions{
+	options := &redis.UniversalOptions{
 		Addrs:           addrs,
 		Username:        redisConfig.UserName(),
 		Password:        redisConfig.Password(),
@@ -66,10 +66,15 @@ func NewClient(log logger.Logger, redisConfig config.RedisConfig) Client {
 		MinIdleConns:    redisConfig.MaxIdle(),
 		ConnMaxIdleTime: redisConfig.IdleTimeout(),
 		ConnMaxLifetime: redisConfig.MaxConnLifetime(),
-		TLSConfig: &tls.Config{
+	}
+
+	if redisConfig.TLSEnabled() {
+		options.TLSConfig = &tls.Config{
 			ServerName: redisConfig.Host(),
-		},
-	})
+		}
+	}
+
+	rdb := redis.NewUniversalClient(options)
 
 	// Test the connection
 	ctx, cancel := context.WithTimeout(context.Background(), redisConfig.DialTimeout())

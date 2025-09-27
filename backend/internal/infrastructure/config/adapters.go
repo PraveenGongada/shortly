@@ -73,6 +73,8 @@ func (r *RedisConfigAdapter) MaxConnLifetime() time.Duration {
 	return r.config.Database.Redis.Pool.MaxConnLifetime
 }
 
+func (r *RedisConfigAdapter) TLSEnabled() bool { return r.config.Database.Redis.TLSEnabled }
+
 type SecurityConfigAdapter struct {
 	config *Config
 }

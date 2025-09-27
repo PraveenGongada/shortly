@@ -85,6 +85,7 @@ type RedisConfig interface {
 	MaxActive() int
 	IdleTimeout() time.Duration
 	MaxConnLifetime() time.Duration
+	TLSEnabled() bool
 }
 
 // SecurityConfig defines configuration needed for security features
