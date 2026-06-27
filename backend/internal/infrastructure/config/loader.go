@@ -40,6 +40,7 @@ type GracefulConfig struct {
 
 type ApplicationConfig struct {
 	Port                int            `yaml:"port"                  mapstructure:"PORT"                  validate:"required,min=1,max=65535"`
+	AdminPort           int            `yaml:"admin_port"            mapstructure:"ADMIN_PORT"            validate:"required,min=1,max=65535"`
 	ShortUrlLength      int8           `yaml:"short_url_length"      mapstructure:"SHORT_URL_LENGTH"      validate:"required,min=4,max=20"`
 	MaxCollisionRetries int8           `yaml:"max_collision_retries" mapstructure:"MAX_COLLISION_RETRIES" validate:"required,min=1,max=10"`
 	Environment         string         `yaml:"environment"           mapstructure:"ENVIRONMENT"           validate:"required,oneof=DEVELOPMENT STAGING PRODUCTION"`

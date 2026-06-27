@@ -17,8 +17,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -56,9 +54,9 @@ func New(
 func (h *Handler) Router(r chi.Router) {
 	r.Use(middleware.StripSlashes)
 	r.Use(httpmiddleware.RequestLogger(h.logger))
+	r.Use(httpmiddleware.Metrics())
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/health", health)
 		r.Route("/user", func(r chi.Router) {
 			r.Post("/login", h.UserLogin)
 			r.Post("/register", h.UserRegister)
@@ -80,8 +78,4 @@ func (h *Handler) Router(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Get("/{shortUrl}", h.RedirectUser)
 	})
-}
-
-func health(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("App is running!"))
 }

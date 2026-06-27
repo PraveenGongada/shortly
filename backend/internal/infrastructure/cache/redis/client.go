@@ -30,6 +30,7 @@ import (
 
 type Client interface {
 	Client() redis.UniversalClient
+	HealthCheck(ctx context.Context) error
 	Close() error
 }
 
@@ -39,6 +40,10 @@ type client struct {
 
 func (c *client) Client() redis.UniversalClient {
 	return c.rdb
+}
+
+func (c *client) HealthCheck(ctx context.Context) error {
+	return c.rdb.Ping(ctx).Err()
 }
 
 func (c *client) Close() error {

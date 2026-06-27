@@ -30,6 +30,7 @@ import (
 type Store interface {
 	Pool() *pgxpool.Pool
 	GetQueryTimeout() time.Duration
+	HealthCheck(ctx context.Context) error
 	Close()
 }
 
@@ -44,6 +45,10 @@ func (s *store) Pool() *pgxpool.Pool {
 
 func (s *store) GetQueryTimeout() time.Duration {
 	return s.queryTimeout
+}
+
+func (s *store) HealthCheck(ctx context.Context) error {
+	return s.pool.Ping(ctx)
 }
 
 func (s *store) Close() {

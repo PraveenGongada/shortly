@@ -56,6 +56,7 @@ type URLConfig interface {
 // ServerConfig defines configuration needed for HTTP server
 type ServerConfig interface {
 	Port() int
+	AdminPort() int
 	GracefulShutdownTimeout() time.Duration
 }
 

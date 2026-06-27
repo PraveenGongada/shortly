@@ -1,5 +1,6 @@
 application:
   port: 8080
+  admin_port: 2112
   short_url_length: 7
   environment: DEVELOPMENT
   max_collision_retries: 1

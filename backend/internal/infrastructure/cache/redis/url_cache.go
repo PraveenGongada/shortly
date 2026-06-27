@@ -44,7 +44,7 @@ func (uc *urlCache) SetShortURL(
 	ttl time.Duration,
 ) error {
 	err := uc.client.Client().Set(ctx, shortCode, originalURL, ttl).Err()
-	if err != nil {
+	if err != redis.Nil && err != nil {
 		uc.logger.Error(ctx, "Error setting shortURL in cache",
 			logger.String("shortCode", shortCode),
 			logger.String("operation", "SetShortURL"),
@@ -58,7 +58,7 @@ func (uc *urlCache) SetShortURL(
 
 func (uc *urlCache) GetOriginalURL(ctx context.Context, shortCode string) (string, error) {
 	url, err := uc.client.Client().Get(ctx, shortCode).Result()
-	if err != nil {
+	if err != redis.Nil && err != nil {
 		uc.logger.Error(ctx, "Error getting shortURL in cache",
 			logger.String("shortCode", shortCode),
 			logger.String("operation", "GetOriginalURL"),

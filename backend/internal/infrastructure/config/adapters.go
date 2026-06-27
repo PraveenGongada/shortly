@@ -188,6 +188,8 @@ func NewServerConfigAdapter(cfg *Config) domainConfig.ServerConfig {
 
 func (s *ServerConfigAdapter) Port() int { return s.config.Application.Port }
 
+func (s *ServerConfigAdapter) AdminPort() int { return s.config.Application.AdminPort }
+
 func (s *ServerConfigAdapter) GracefulShutdownTimeout() time.Duration {
 	return s.config.Application.Graceful.MaxSecond
 }

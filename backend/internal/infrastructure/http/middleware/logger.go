@@ -37,7 +37,6 @@ func RequestLogger(domainLogger logger.Logger) func(next http.Handler) http.Hand
 			}
 
 			ctx := r.Context()
-			// Add request ID to logger context using domain logger
 			ctx = domainLogger.WithContext(ctx, logger.String("request_id", requestID))
 			r = r.WithContext(ctx)
 
@@ -56,7 +55,6 @@ func RequestLogger(domainLogger logger.Logger) func(next http.Handler) http.Hand
 
 			// Use domain logger with structured fields
 			logFields := []logger.Field{
-				logger.String("request_id", requestID),
 				logger.String("remote_addr", remoteAddr),
 				logger.String("method", method),
 				logger.String("path", path),

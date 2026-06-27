@@ -26,6 +26,7 @@ import (
 	"github.com/PraveenGongada/shortly/internal/domain/shared/config"
 	"github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
+	"github.com/PraveenGongada/shortly/internal/shared/health"
 )
 
 type Server struct {
@@ -33,18 +34,39 @@ type Server struct {
 	httpServer   *http.Server
 	logger       logger.Logger
 	serverConfig config.ServerConfig
+	readiness    *health.Checker
 }
 
-func New(HttpRouter *router.Router, log logger.Logger, serverConfig config.ServerConfig) *Server {
+func New(
+	HttpRouter *router.Router,
+	log logger.Logger,
+	serverConfig config.ServerConfig,
+	readiness *health.Checker,
+) *Server {
 	return &Server{
 		HttpRouter:   HttpRouter,
 		logger:       log,
 		serverConfig: serverConfig,
+		readiness:    readiness,
 	}
 }
 
 func (r *Server) setupRouter(app *chi.Mux) {
 	r.HttpRouter.Router(app)
+}
+
+func (p *Server) withProbes(app http.Handler) http.Handler {
+	probes := newProbes(p.logger, p.readiness)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/livez":
+			probes.Live(w, r)
+		case "/readyz":
+			probes.Ready(w, r)
+		default:
+			app.ServeHTTP(w, r)
+		}
+	})
 }
 
 func (p *Server) Listen() error {
@@ -55,7 +77,7 @@ func (p *Server) Listen() error {
 	serverPort := fmt.Sprintf(":%d", p.serverConfig.Port())
 	p.httpServer = &http.Server{
 		Addr:    serverPort,
-		Handler: app,
+		Handler: p.withProbes(app),
 	}
 
 	p.logger.Info(context.Background(), "Server started on port", logger.String("port", serverPort))

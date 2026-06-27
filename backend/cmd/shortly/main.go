@@ -18,15 +18,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	nethttp "net/http"
 
 	_ "github.com/PraveenGongada/shortly/api"
+	logfield "github.com/PraveenGongada/shortly/internal/domain/shared/logger"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/config"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/http/router"
 	"github.com/PraveenGongada/shortly/internal/infrastructure/logging/zerolog"
 	wireProviders "github.com/PraveenGongada/shortly/internal/infrastructure/wire"
 	"github.com/PraveenGongada/shortly/internal/shared/graceful"
+	"github.com/PraveenGongada/shortly/internal/shared/health"
 )
 
 // @title URL Shortener API
@@ -62,9 +66,20 @@ func main() {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
 
+	readiness := health.New()
+	readiness.Register("postgres", app.PostgresClient.HealthCheck)
+	readiness.Register("redis", app.RedisClient.HealthCheck)
+
 	// Initialize HTTP layer (these remain manual as they're infrastructure wiring)
 	routerInstance := router.New(app.Handler, securityConfig, domainLogger)
-	server := http.New(routerInstance, domainLogger, serverConfig)
+	server := http.New(routerInstance, domainLogger, serverConfig, readiness)
+	adminServer := http.NewAdminServer(serverConfig, domainLogger)
+
+	go func() {
+		if err := adminServer.Listen(); err != nil && !errors.Is(err, nethttp.ErrServerClosed) {
+			domainLogger.Error(context.Background(), "Admin server error", logfield.Error(err))
+		}
+	}()
 
 	// Set up graceful shutdown with proper context handling
 	graceful.GracefulShutdown(
@@ -75,6 +90,9 @@ func main() {
 		map[string]graceful.Operation{
 			"http": func(ctx context.Context) error {
 				return server.Shutdown(ctx)
+			},
+			"admin": func(ctx context.Context) error {
+				return adminServer.Shutdown(ctx)
 			},
 			"postgres": func(ctx context.Context) error {
 				app.PostgresClient.Close()
