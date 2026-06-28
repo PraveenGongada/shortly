@@ -44,9 +44,9 @@ Shortly is a complete URL shortening solution combining a beautiful, responsive 
 
 ```
 shortly/
-├── frontend/               # Next.js frontend application
-│   ├── app/                # Pages and routes
-│   ├── components/         # Reusable UI components
+├── frontend/               # React + Vite frontend (static SPA, served by nginx)
+│   ├── src/                # Pages, components, hooks, lib
+│   ├── nginx.conf          # Production web server config
 │   ├── README.md           # Frontend-specific documentation
 │   └── ...
 ├── backend/                # Go backend service
@@ -71,11 +71,15 @@ shortly/
 
 ### Frontend
 
-- **Framework**: Next.js 14+
+- **Build Tool**: Vite
+- **Library**: React 18
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **UI Components**: Radix UI/shadcn/ui
+- **Data Fetching**: TanStack Query
+- **Forms**: React Hook Form + Zod
+- **UI Components**: Radix UI/shadcn-style
 - **Icons**: Lucide React
+- **Serving**: nginx (static)
 
 ### Backend
 

@@ -1,66 +1,128 @@
-# Shortly — Frontend
+# Shortly
 
-A minimal, dark, production-grade frontend for the Shortly URL shortener. Built
-as a static React SPA (Vite + TypeScript + Tailwind) and served by nginx.
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/docs/images/logo.svg" alt="Shortly Logo" width="200" />
+  <p></p>
 
-## Stack
+[![Vite](https://img.shields.io/badge/Vite-^6.4.3-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-^5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+[![Tailwind](https://img.shields.io/badge/Tailwind-^3.4.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com)
+[![License](https://img.shields.io/github/license/PraveenGongada/shortly?style=flat-square)](LICENSE)
 
-- **Vite + React 18 + TypeScript** — static SPA, no SSR/Node server at runtime
-- **Tailwind CSS** — dark, monochrome (Vercel-style) design; **Geist** font
-- **TanStack Query** — link data fetching/caching/invalidation
-- **react-hook-form + zod** — forms with validation mirroring the backend
-- **Radix Dialog**, **sonner** (toasts), **lucide-react** (icons), **qrcode.react**
-- **nginx** (unprivileged) — serves the build + SPA fallback
+  <p></p>
+  <p>A modern, fast, and easy-to-use URL shortening website built with React and Vite</p>
+</div>
 
-## Features
+## ✨ Features
 
-Mirrors the backend API exactly:
+- **Instant URL Shortening**: Transform long URLs into compact, shareable links with a single click
+- **User Dashboard**: Manage all your shortened URLs in one convenient location
+- **Click Analytics**: Track the performance of your links with detailed redirect statistics
+- **QR Codes**: Generate a scannable QR code for any short link, client-side
+- **Secure Authentication**: Complete user authentication system with registration and login
+- **Responsive Design**: Beautiful dark UI that works seamlessly across desktop and mobile devices
+- **Modern Tech Stack**: Built as a static React SPA with Vite, TypeScript, and Tailwind CSS, served by nginx
 
-- Register / login / logout (JWT via HttpOnly cookie; register auto-logs-in)
-- Create short links, list (paginated), edit destination, delete
-- Per-link click count, copy, and a client-side **QR code**
-- In-app short-link resolver at `/{code}` (forwards to the destination)
+## 🚀 Getting Started
 
-## Develop
+### Prerequisites
+
+- Node.js 20.x or later
+- yarn
+
+### Installation and Setup
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/praveengongada/shortly.git
+cd shortly/frontend
+```
+
+2. **Install frontend dependencies**
 
 ```bash
 yarn install
-yarn dev             # http://localhost:3000, proxies /api -> $BACKEND_URL
 ```
 
-Point the dev proxy at your backend (defaults to `http://localhost:8080`):
+3. **Start the development server**
 
 ```bash
-BACKEND_URL=http://localhost:8080 yarn dev
+yarn dev
 ```
 
-Copy `.env.example` to `.env` to set `VITE_BACKEND_URL` (leave empty for the
-same-origin `/api` default).
+4. **Access the application**
 
-## Build
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Build
 
 ```bash
-yarn build           # type-checks then emits dist/
-yarn preview         # serve the production build locally
+yarn build      # type-checks, then emits the static build to dist/
+yarn preview    # serve the production build locally
 ```
 
-## Docker
+## 🏗️ Project Structure
 
-The image is a static build served by non-root nginx on **port 3000**.
-
-```bash
-docker build -t shortly-frontend .
-docker run --rm -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8080 shortly-frontend
+```
+/
+├── public/                  # Static assets (favicons)
+├── nginx.conf               # Production web server config
+├── Dockerfile               # Build (Vite) → serve (nginx) image
+└── src/
+    ├── main.tsx             # App entry (router + query/auth providers)
+    ├── App.tsx              # Route definitions
+    ├── pages/               # Route pages
+    │   ├── Landing.tsx      # Public landing page
+    │   ├── Login.tsx        # Login
+    │   ├── Register.tsx     # Registration
+    │   ├── Dashboard.tsx    # Authenticated link management
+    │   ├── RedirectShort.tsx  # /{code} short-link resolver
+    │   └── NotFound.tsx     # 404
+    ├── components/          # Reusable UI components
+    │   ├── ui/              # Primitives (button, dialog, input, ...)
+    │   └── ...              # CreateBar, LinkRow, Navbar, dialogs, ...
+    ├── auth/                # Auth context + route guards
+    │   ├── AuthContext.tsx
+    │   └── ProtectedRoute.tsx
+    ├── hooks/               # Data + UI hooks (useLinks, useCopy)
+    ├── lib/                 # api client, query client, utils, validators
+    └── types/               # Shared TypeScript types
 ```
 
-Build-time arg: `VITE_BACKEND_URL` (default empty → relative `/api`; set it to an
-absolute URL like `https://api.shortly.com` to call that backend verbatim when
-it's on a different host). Runtime env: `BACKEND_URL` for the optional `/api`
-proxy (inert when an Istio gateway already routes `/api/*` to the backend).
+## 📚 Tech Stack
 
-## How requests work
+- [Vite](https://vitejs.dev/) - Build tool & dev server
+- [React](https://react.dev/) - UI library
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [TanStack Query](https://tanstack.com/query) - Data fetching & caching
+- [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) - Forms & validation
+- [Radix UI](https://www.radix-ui.com/) - Accessible UI components
+- [Lucide React](https://lucide.dev/) - Icon library
+- [nginx](https://nginx.org/) - Production static serving
 
-The SPA calls a relative `/api`. With the existing Istio gateway routing
-`/api/*` → backend and everything else → this app on one domain, the auth cookie
-stays first-party and no CORS config is needed. Short links resolve through the
-SPA (`/{code}` → `GET /api/{code}` → client redirect).
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check [issues page](https://github.com/praveengongada/shortly/issues).
+
+## 📄 License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgements
+
+- [Shadcn UI](https://ui.shadcn.com/) - UI component inspiration
+- [Radix UI](https://www.radix-ui.com/) - Accessible primitives
+- [Vite](https://vitejs.dev/) - Build tooling
+
+---
+
+<div align="center">
+  <p>Made with ❤️ by <a href="https://github.com/PraveenGongada">Praveen Kumar</a></p>
+  <p>
+    <a href="https://linkedin.com/in/praveengongada">LinkedIn</a> •
+    <a href="https://praveengongada.com">Website</a>
+  </p>
+</div>
