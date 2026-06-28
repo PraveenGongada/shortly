@@ -47,7 +47,9 @@ export function CreateBar() {
 
       const link = shortLink(res.short_code);
       const toastId = toast.success("Short link created", {
-        action: <CopyToastButton link={link} onDone={() => toast.dismiss(toastId)} />,
+        action: (
+          <CopyToastButton link={link} onDone={() => toast.dismiss(toastId)} />
+        ),
       });
     } catch (err) {
       toast.error(apiErrorMessage(err, "Could not shorten URL"));
@@ -70,8 +72,12 @@ export function CreateBar() {
             aria-label="Long URL"
           />
         </div>
-        <Button type="submit" loading={createLink.isPending} className="justify-center">
-          Create
+        <Button
+          type="submit"
+          loading={createLink.isPending}
+          className="justify-center rounded-lg"
+        >
+          Shrink
         </Button>
       </form>
 
@@ -82,7 +88,13 @@ export function CreateBar() {
   );
 }
 
-function CopyToastButton({ link, onDone }: { link: string; onDone: () => void }) {
+function CopyToastButton({
+  link,
+  onDone,
+}: {
+  link: string;
+  onDone: () => void;
+}) {
   const { copied, copy } = useCopy(1000);
 
   return (
@@ -92,7 +104,11 @@ function CopyToastButton({ link, onDone }: { link: string; onDone: () => void })
       onClick={() => copy(link, () => setTimeout(onDone, 1000))}
       className="ml-auto rounded-md p-1 text-faint transition hover:bg-white/[0.06] hover:text-fg"
     >
-      {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+      {copied ? (
+        <Check className="h-4 w-4 text-green-400" />
+      ) : (
+        <Copy className="h-4 w-4" />
+      )}
     </button>
   );
 }

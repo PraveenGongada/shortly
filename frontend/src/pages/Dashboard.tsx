@@ -55,7 +55,7 @@ export function Dashboard() {
         <h1 className="mb-4 mt-10 text-lg font-semibold tracking-tight">My links</h1>
 
         <section className="overflow-hidden rounded-xl border border-border bg-surface">
-          {isLoading ? (
+          {isLoading || isFetching ? (
             <div className="flex items-center justify-center py-16">
               <Spinner />
             </div>

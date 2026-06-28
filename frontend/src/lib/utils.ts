@@ -30,22 +30,39 @@ export function displayUrl(url: string): string {
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
+  if (navigator.clipboard?.writeText) {
+    try {
       await navigator.clipboard.writeText(text);
       return true;
+    } catch {
+      // fall through to the legacy path
     }
-  } catch {}
+  }
+
 
   try {
     const el = document.createElement("textarea");
     el.value = text;
+    el.contentEditable = "true";
+    el.readOnly = false;
     el.style.position = "fixed";
-    el.style.opacity = "0";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.style.width = "1px";
+    el.style.height = "1px";
+    el.style.padding = "0";
+    el.style.border = "none";
+    el.style.fontSize = "16px"; // avoid iOS zoom-on-focus
     document.body.appendChild(el);
-    el.select();
+
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    el.setSelectionRange(0, text.length);
     const ok = document.execCommand("copy");
-    document.body.removeChild(el);
+    el.remove();
     return ok;
   } catch {
     return false;
