@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Praveen Kumar
+ * Copyright 2026 Praveen Kumar
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,153 +14,107 @@
  * limitations under the License.
  */
 
-import {
+import type {
+  ApiEnvelope,
   CreateUrlRequest,
   CreateUrlResponse,
-  PaginatedResponse,
-  PaginationParams,
-  SuccessResponse,
-  Token,
+  LoginRequest,
+  RegisterRequest,
+  TokenResponse,
   UrlResponse,
   UrlUpdateRequest,
-  UserLoginRequest,
-  UserRegisterRequest,
-  UserResponse,
 } from "@/types";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = (import.meta.env.VITE_BACKEND_URL || "/api").replace(/\/+$/, "");
 
-// Helper function to handle API responses
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.message || response.statusText || "An error occurred",
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/**
+ * Turn an unknown thrown value into a user-facing message. `byStatus` maps
+ * specific HTTP statuses to friendly copy; otherwise the server message is
+ * used for ApiErrors, and `fallback` for anything else.
+ */
+export function apiErrorMessage(
+  err: unknown,
+  fallback: string,
+  byStatus?: Record<number, string>,
+): string {
+  if (err instanceof ApiError) {
+    return byStatus?.[err.status] ?? err.message;
+  }
+  return fallback;
+}
+
+type RequestOptions = {
+  method?: string;
+  body?: unknown;
+};
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: options.method ?? "GET",
+      credentials: "include",
+      headers:
+        options.body !== undefined
+          ? { "Content-Type": "application/json" }
+          : undefined,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiError("Network error — is the server reachable?", 0);
+  }
+
+  const raw = await res.text();
+  let envelope: ApiEnvelope<T> | null = null;
+  if (raw) {
+    try {
+      envelope = JSON.parse(raw) as ApiEnvelope<T>;
+    } catch {
+      envelope = null;
+    }
+  }
+
+  if (!res.ok) {
+    throw new ApiError(
+      envelope?.message || res.statusText || "Something went wrong",
+      res.status,
     );
   }
 
-  return response.json() as Promise<T>;
+  return envelope?.data as T;
 }
 
-// Helper to get common headers
-function getCommonHeaders(): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-  };
-}
-
-// Auth related API calls
 export const authApi = {
-  login: async (data: UserLoginRequest): Promise<Token> => {
-    const response = await fetch(`${API_BASE_URL}/user/login`, {
-      method: "POST",
-      headers: getCommonHeaders(),
-      body: JSON.stringify(data),
-      credentials: "include", // This is important for cookies
-    });
+  login: (data: LoginRequest) =>
+    request<TokenResponse>("/user/login", { method: "POST", body: data }),
 
-    const result = await handleResponse<Token>(response);
+  register: (data: RegisterRequest) =>
+    request<TokenResponse>("/user/register", { method: "POST", body: data }),
 
-    // Set a cookie to identify authenticated state
-    document.cookie = `token=${result.token}; path=/;`;
-
-    return result;
-  },
-
-  register: async (data: UserRegisterRequest): Promise<UserResponse> => {
-    const response = await fetch(`${API_BASE_URL}/user/register`, {
-      method: "POST",
-      headers: getCommonHeaders(),
-      body: JSON.stringify(data),
-      credentials: "include",
-    });
-
-    return handleResponse<UserResponse>(response);
-  },
-
-  logout: async (): Promise<SuccessResponse> => {
-    const response = await fetch(`${API_BASE_URL}/user/logout`, {
-      method: "GET",
-      headers: getCommonHeaders(),
-      credentials: "include",
-    });
-
-    // Clear auth token cookie
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-    return handleResponse<SuccessResponse>(response);
-  },
+  logout: () => request<null>("/user/logout", { method: "GET" }),
 };
 
-// URL shortening related API calls
 export const urlApi = {
-  createShortUrl: async (
-    data: CreateUrlRequest,
-  ): Promise<CreateUrlResponse> => {
-    const response = await fetch(`${API_BASE_URL}/url/create`, {
-      method: "POST",
-      headers: getCommonHeaders(),
-      body: JSON.stringify(data),
-      credentials: "include",
-    });
+  create: (data: CreateUrlRequest) =>
+    request<CreateUrlResponse>("/url/create", { method: "POST", body: data }),
 
-    return handleResponse<CreateUrlResponse>(response);
-  },
+  list: (limit: number, offset: number) =>
+    request<UrlResponse[] | null>(`/urls?limit=${limit}&offset=${offset}`),
 
-  getUrls: async (
-    params: PaginationParams,
-  ): Promise<PaginatedResponse<UrlResponse>> => {
-    const { limit, offset } = params;
-    const response = await fetch(
-      `${API_BASE_URL}/urls?limit=${limit}&offset=${offset}`,
-      {
-        method: "GET",
-        headers: getCommonHeaders(),
-        credentials: "include",
-      },
-    );
+  update: (data: UrlUpdateRequest) =>
+    request<null>("/url/update", { method: "PATCH", body: data }),
 
-    return handleResponse<PaginatedResponse<UrlResponse>>(response);
-  },
+  remove: (id: string) =>
+    request<null>(`/url/${id}`, { method: "DELETE" }),
 
-  updateUrl: async (data: UrlUpdateRequest): Promise<SuccessResponse> => {
-    const response = await fetch(`${API_BASE_URL}/url/update`, {
-      method: "PATCH",
-      headers: getCommonHeaders(),
-      body: JSON.stringify(data),
-      credentials: "include",
-    });
-
-    return handleResponse<SuccessResponse>(response);
-  },
-
-  deleteUrl: async (id: string): Promise<SuccessResponse> => {
-    const response = await fetch(`${API_BASE_URL}/url/${id}`, {
-      method: "DELETE",
-      headers: getCommonHeaders(),
-      credentials: "include",
-    });
-
-    return handleResponse<SuccessResponse>(response);
-  },
-
-  getAnalytics: async (shortUrl: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/url/analytics/${shortUrl}`, {
-      method: "GET",
-      headers: getCommonHeaders(),
-      credentials: "include",
-    });
-
-    return handleResponse<any>(response);
-  },
-
-  redirect: async (shortUrl: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/${shortUrl}`, {
-      method: "GET",
-      headers: getCommonHeaders(),
-    });
-
-    return handleResponse<any>(response);
-  },
+  resolve: (code: string) => request<string>(`/${encodeURIComponent(code)}`),
 };

@@ -1,118 +1,66 @@
-# Shortly
+# Shortly — Frontend
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/docs/images/logo.svg" alt="Shortly Logo" width="200" />
-  <p></p>
+A minimal, dark, production-grade frontend for the Shortly URL shortener. Built
+as a static React SPA (Vite + TypeScript + Tailwind) and served by nginx.
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.2.0-black?style=flat-square&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-^5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![Tailwind](https://img.shields.io/badge/Tailwind-^3.3.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com)
-[![License](https://img.shields.io/github/license/PraveenGongada/shortly?style=flat-square)](LICENSE)
+## Stack
 
-  <p></p>
-  <p>A modern, fast, and easy-to-use URL shortening website built with Next.js</p>
-</div>
+- **Vite + React 18 + TypeScript** — static SPA, no SSR/Node server at runtime
+- **Tailwind CSS** — dark, monochrome (Vercel-style) design; **Geist** font
+- **TanStack Query** — link data fetching/caching/invalidation
+- **react-hook-form + zod** — forms with validation mirroring the backend
+- **Radix Dialog**, **sonner** (toasts), **lucide-react** (icons), **qrcode.react**
+- **nginx** (unprivileged) — serves the build + SPA fallback
 
-## ✨ Features
+## Features
 
-- **Instant URL Shortening**: Transform long URLs into compact, shareable links with a single click
-- **User Dashboard**: Manage all your shortened URLs in one convenient location
-- **Click Analytics**: Track the performance of your links with detailed redirect statistics
-- **Secure Authentication**: Complete user authentication system with registration and login
-- **Responsive Design**: Beautiful UI that works seamlessly across desktop and mobile devices
-- **Modern Tech Stack**: Built with Next.js, TypeScript, and Tailwind CSS for the frontend
+Mirrors the backend API exactly:
 
-## 🚀 Getting Started
+- Register / login / logout (JWT via HttpOnly cookie; register auto-logs-in)
+- Create short links, list (paginated), edit destination, delete
+- Per-link click count, copy, and a client-side **QR code**
+- In-app short-link resolver at `/{code}` (forwards to the destination)
 
-### Prerequisites
-
-- Node.js 18.x or later
-- yarn
-
-### Installation and Setup
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/praveengongada/shortly.git
-cd shortly/frontend
-```
-
-2. **Install frontend dependencies**
+## Develop
 
 ```bash
 yarn install
+yarn dev             # http://localhost:3000, proxies /api -> $BACKEND_URL
 ```
 
-3. **Start the development server**
+Point the dev proxy at your backend (defaults to `http://localhost:8080`):
 
 ```bash
-yarn dev
+BACKEND_URL=http://localhost:8080 yarn dev
 ```
 
-4. **Access the application**
+Copy `.env.example` to `.env` to set `VITE_BACKEND_URL` (leave empty for the
+same-origin `/api` default).
 
-Open [http://localhost:3001](http://localhost:3001) in your browser.
+## Build
 
-## 🏗️ Project Structure
-
-```
-/
-├── public/              # Static assets
-└── src/
-    ├── app/             # Next.js app directory
-    │   ├── dashboard/   # Dashboard page
-    │   ├── login/       # Login page
-    │   ├── register/    # Registration page
-    │   └── [shortUrl]/  # URL redirection page
-    ├── components/      # Reusable UI components
-    │   ├── ui/          # UI components (buttons, cards, etc.)
-    │   └── Navbar.tsx   # Navigation component
-    ├── contexts/        # React contexts
-    │   └── AuthContext.tsx  # Authentication context
-    ├── lib/             # Utility functions
-    │   ├── api.ts       # API client
-    │   └── utils.ts     # Helper functions
-    └── middleware/      # Next.js middleware
+```bash
+yarn build           # type-checks then emits dist/
+yarn preview         # serve the production build locally
 ```
 
-## 🔧 Configuration
+## Docker
 
-The application can be configured using environment variables:
+The image is a static build served by non-root nginx on **port 3000**.
 
-```env
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8080/api  # URL of the backend API
+```bash
+docker build -t shortly-frontend .
+docker run --rm -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8080 shortly-frontend
 ```
 
-## 📚 Tech Stack
+Build-time arg: `VITE_BACKEND_URL` (default empty → relative `/api`; set it to an
+absolute URL like `https://api.shortly.com` to call that backend verbatim when
+it's on a different host). Runtime env: `BACKEND_URL` for the optional `/api`
+proxy (inert when an Istio gateway already routes `/api/*` to the backend).
 
-- [Next.js](https://nextjs.org/) - React framework
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [Radix UI](https://www.radix-ui.com/) - Accessible UI components
-- [Lucide React](https://lucide.dev/) - Icon library
+## How requests work
 
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome! Feel free to check [issues page](https://github.com/praveengongada/shortly/issues).
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgements
-
-- [Shadcn UI](https://ui.shadcn.com/) - UI components
-- [Vercel](https://vercel.com/) - Deployment platform
-- [Next.js](https://nextjs.org/) - The React Framework
-
----
-
-<div align="center">
-  <p>Made with ❤️ by <a href="https://github.com/PraveenGongada">Praveen Kumar</a></p>
-  <p>
-    <a href="https://linkedin.com/in/praveengongada">LinkedIn</a> •
-    <a href="https://praveengongada.com">Website</a>
-  </p>
-</div>
+The SPA calls a relative `/api`. With the existing Istio gateway routing
+`/api/*` → backend and everything else → this app on one domain, the auth cookie
+stays first-party and no CORS config is needed. Short links resolve through the
+SPA (`/{code}` → `GET /api/{code}` → client redirect).

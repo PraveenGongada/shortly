@@ -1,7 +1,7 @@
 security:
   cors:
     allowed_origins:
-      - "http://localhost:3001"
+      - "http://localhost:3000"
     allowed_methods:
       - "GET"
       - "POST"

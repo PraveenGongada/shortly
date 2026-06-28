@@ -34,7 +34,7 @@ jobs:
         working-directory: ./frontend
         run: yarn install --frozen-lockfile
 
-      - name: Build Next.js project
+      - name: Build frontend
         working-directory: ./frontend
         run: yarn build
 

@@ -1,61 +1,22 @@
-FROM node:22.15.0-alpine3.21 AS base
 
-# Install dependencies only when needed
-FROM base AS deps
+FROM node:22-alpine AS build
 WORKDIR /app
 
-# Copy package files
-COPY package.json yarn.lock* ./
-
-# Install dependencies
-# If using yarn:
+COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Update next.config.js to ensure standalone output
-RUN if ! grep -q "output: 'standalone'" next.config.js; then \
-  sed -i "s/const nextConfig = {/const nextConfig = {output: 'standalone',/" next.config.js; \
-  fi
+ARG VITE_BACKEND_URL=
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 
-# Build the application
-RUN npm run build
+RUN yarn build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 
-# Set production environment
-ENV NODE_ENV=production
+ENV BACKEND_URL=http://shortly-backend:8080
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Copy necessary files
-COPY --from=builder /app/public ./public
-
-# Ensure standalone output exists
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Set user
-USER nextjs
-
-# Expose port
-EXPOSE 3001
-
-# Set environment variables
-ENV PORT=3001
-ENV HOSTNAME="0.0.0.0"
-
-# Health check to ensure the application is running
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/ || exit 1
-
-# Run the application
-CMD ["node", "server.js"]
+EXPOSE 3000

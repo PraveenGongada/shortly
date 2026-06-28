@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Praveen Kumar
+ * Copyright 2026 Praveen Kumar
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,25 @@
  * limitations under the License.
  */
 
-export interface SuccessResponse {
-  message: string;
-  success: boolean;
+export interface ApiEnvelope<T> {
+  message?: string;
+  data?: T;
+}
+
+export interface TokenResponse {
+  type: string;
+  token: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
 }
 
 export interface CreateUrlRequest {
@@ -25,7 +41,7 @@ export interface CreateUrlRequest {
 
 export interface CreateUrlResponse {
   id: string;
-  short_url: string;
+  short_code: string;
 }
 
 export interface UrlResponse {
@@ -38,47 +54,4 @@ export interface UrlResponse {
 export interface UrlUpdateRequest {
   id: string;
   new_url: string;
-}
-
-export interface DeleteUrlRequest {
-  id: string;
-}
-
-export interface Token {
-  type: string;
-  token: string;
-}
-
-export interface UserLoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface UserRegisterRequest {
-  email: string;
-  password: string;
-  name: string;
-}
-
-export interface UserResponse {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface UserTokenResponse {
-  type: string;
-  token: string;
-}
-
-export interface PaginationParams {
-  limit: number;
-  offset: number;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  limit: number;
-  offset: number;
 }

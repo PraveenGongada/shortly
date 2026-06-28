@@ -14,23 +14,15 @@
  * limitations under the License.
  */
 
-import { LogOut } from "lucide-react";
-import { Logo } from "@/components/Logo";
-import { Button } from "@/components/ui/button";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 
-export function Navbar() {
-  const { logout } = useAuth();
+export function ProtectedRoute() {
+  const { isAuthed } = useAuth();
+  return isAuthed ? <Outlet /> : <Navigate to="/login" replace />;
+}
 
-  return (
-    <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur-md">
-      <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Logo to="/dashboard" />
-        <Button variant="ghost" size="sm" onClick={() => void logout()}>
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
-      </div>
-    </header>
-  );
+export function PublicOnlyRoute() {
+  const { isAuthed } = useAuth();
+  return isAuthed ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }

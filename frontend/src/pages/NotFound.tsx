@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-import { LogOut } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/auth/AuthContext";
 
-export function Navbar() {
-  const { logout } = useAuth();
-
+export function NotFound() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur-md">
-      <div className="flex h-14 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Logo to="/dashboard" />
-        <Button variant="ghost" size="sm" onClick={() => void logout()}>
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
-      </div>
-    </header>
+    <div className="flex min-h-full flex-col items-center justify-center px-4 text-center">
+      <p className="font-mono text-sm text-faint">404</p>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Page not found</h1>
+      <p className="mt-2 max-w-xs text-sm text-muted">
+        The page you're looking for doesn't exist.
+      </p>
+      <Link to="/" className="mt-6">
+        <Button variant="secondary">Back home</Button>
+      </Link>
+    </div>
   );
 }
