@@ -1,7 +1,6 @@
 security:
   cors:
     allowed_origins:
-      - "shortly.praveengongada.com"
       - "http://localhost:3001"
     allowed_methods:
       - "GET"
@@ -16,5 +15,6 @@ security:
       - "Content-Type"
       - "X-CSRF-Token"
     allow_credentials: true
-    max_age: 300  # preflight cache duration in seconds
+    max_age: 300 # preflight cache duration in seconds
   request_timeout: 30s
+

@@ -1,7 +1,7 @@
 database:
   postgres:
     host: localhost
-    name: postgres
+    name: shortly
     port: 5432
     ssl_mode: disable
     query_timeout: 5s
