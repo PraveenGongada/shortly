@@ -25,9 +25,9 @@ Shortly is a complete URL shortening solution combining a beautiful, responsive 
   
   <div style="display: flex; justify-content: space-between;">
     <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/frontend/docs/images/home.png" alt="Home Page" width="48%" style="border-radius: 12px;"/>
-    <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/frontend/docs/images/create.png" alt="Create URL" width="48%" style="border-radius: 12px;"/>
+    <img src="https://raw.githubusercontent.com/PraveenGongada/shortly/refs/heads/main/frontend/docs/images/qr.png" alt="Create URL" width="48%" style="border-radius: 12px;"/>
   </div>
-  <p><em>Home Page and URL Creation Interface</em></p>
+  <p><em>Home Page and QR Code Display for Short URL</em></p>
 </div>
 
 ## ✨ Features
